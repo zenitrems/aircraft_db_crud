@@ -1,6 +1,18 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { Aircraft, Operator, Category } from "@/lib/types";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import type { Aircraft, Category, Operator } from "@/lib/types";
+import {
+  Button,
+  EmptyTableState,
+  FieldLabel,
+  Panel,
+  SectionHeader,
+  SelectInput,
+  TableHeaderCell,
+  TextareaInput,
+  TextInput,
+  cn,
+} from "@/components/ui";
 
 const EMPTY_FORM = { icao: "", reg: "", serial: "", airframe: "", type: "", operator_id: "", category_id: "", note: "" };
 type FormData = typeof EMPTY_FORM;
@@ -29,8 +41,11 @@ export default function AircraftManager() {
       setAircraft(json.aircraft ?? []);
       setOperators(json.operators ?? []);
       setCategories(json.categories ?? []);
-    } catch { showToast("Failed to load data", "err"); }
-    finally { setLoading(false); }
+    } catch {
+      showToast("Failed to load data", "err");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
@@ -39,15 +54,28 @@ export default function AircraftManager() {
 
   const handleEdit = (a: Aircraft) => {
     setEditing(a.id);
-    setForm({ icao: a.icao ?? "", reg: a.reg ?? "", serial: a.serial ?? "", airframe: a.airframe ?? "", type: a.type ?? "", operator_id: a.operator_id?.toString() ?? "", category_id: a.category_id?.toString() ?? "", note: a.note ?? "" });
+    setForm({
+      icao: a.icao ?? "",
+      reg: a.reg ?? "",
+      serial: a.serial ?? "",
+      airframe: a.airframe ?? "",
+      type: a.type ?? "",
+      operator_id: a.operator_id?.toString() ?? "",
+      category_id: a.category_id?.toString() ?? "",
+      note: a.note ?? "",
+    });
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!form.icao.trim()) return showToast("ICAO is required", "err");
     setSaving(true);
-    const payload = { ...form, operator_id: form.operator_id ? parseInt(form.operator_id) : null, category_id: form.category_id ? parseInt(form.category_id) : null };
+    const payload = {
+      ...form,
+      operator_id: form.operator_id ? parseInt(form.operator_id) : null,
+      category_id: form.category_id ? parseInt(form.category_id) : null,
+    };
     try {
       const res = await fetch(editing ? `/api/aircraft/${editing}` : "/api/aircraft", {
         method: editing ? "PUT" : "POST",
@@ -58,8 +86,11 @@ export default function AircraftManager() {
       showToast(editing ? "Aircraft updated" : "Aircraft created");
       resetForm();
       fetchAll();
-    } catch { showToast("Save failed", "err"); }
-    finally { setSaving(false); }
+    } catch {
+      showToast("Save failed", "err");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -69,109 +100,132 @@ export default function AircraftManager() {
       showToast("Aircraft deleted");
       setConfirmDelete(null);
       fetchAll();
-    } catch { showToast("Delete failed", "err"); }
+    } catch {
+      showToast("Delete failed", "err");
+    }
   };
-
-  const labelStyle = { fontSize: 10, color: "var(--text-dim)", letterSpacing: "0.15em", marginBottom: 4, display: "block" };
 
   return (
     <div>
       {toast && (
-        <div style={{ position: "fixed", top: 70, right: 24, padding: "10px 20px", background: toast.type === "ok" ? "var(--bg-elevated)" : "rgba(255,40,40,0.15)", border: `1px solid ${toast.type === "ok" ? "var(--border-active)" : "var(--red)"}`, color: toast.type === "ok" ? "var(--green-bright)" : "var(--red)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 12, zIndex: 200, letterSpacing: "0.05em" }}>
-          {toast.type === "ok" ? "✓" : "✗"} {toast.msg.toUpperCase()}
+        <div
+          className={cn(
+            "fixed right-6 top-[70px] z-[200] rounded-md border px-5 py-2.5 font-mono text-xs tracking-[0.05em]",
+            toast.type === "ok"
+              ? "border-ops-active bg-ops-elevated text-ops-accentMuted"
+              : "border-ops-danger bg-red-400/15 text-ops-danger",
+          )}
+        >
+          {toast.type === "ok" ? "OK" : "ERROR"}: {toast.msg.toUpperCase()}
         </div>
       )}
 
-      <div style={{ marginBottom: 20 }}>
-        <div style={{ fontFamily: "var(--display)", fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.2em" }}>AIRCRAFT MANAGEMENT</div>
-        <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)", marginTop: 2 }}>{editing ? `Editing Aircraft #${editing}` : "Add New Aircraft"}</div>
-      </div>
+      <SectionHeader
+        eyebrow="AIRCRAFT MANAGEMENT"
+        title={editing ? `Editing Record #${editing}` : "Add Aircraft Record"}
+      />
 
-      <div style={{ background: "var(--bg-panel)", border: `1px solid ${editing ? "var(--border-active)" : "var(--border-dim)"}`, borderRadius: 4, padding: 20, marginBottom: 24 }}>
+      <Panel className={cn("mb-6 p-5", editing !== null && "border-ops-active")}>
         {editing && (
-          <div style={{ marginBottom: 16, padding: "6px 12px", background: "var(--green-ghost)", border: "1px solid var(--border-active)", borderRadius: 3, fontSize: 11, color: "var(--green-bright)", letterSpacing: "0.1em" }}>
-            ✦ EDIT MODE — ID #{editing}
+          <div className="mb-4 rounded-md border border-ops-active bg-ops-accentGhost px-3 py-1.5 text-[11px] tracking-[0.1em] text-ops-accentMuted">
+            EDIT MODE - RECORD #{editing}
           </div>
         )}
         <form onSubmit={handleSubmit}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12, marginBottom: 16 }}>
+          <div className="mb-4 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
             {(["icao", "reg", "serial", "airframe", "type"] as const).map(f => (
               <div key={f}>
-                <label style={labelStyle}>{f.toUpperCase()} {f === "icao" && "*"}</label>
-                <input value={form[f]} onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))} placeholder={`Enter ${f}`} required={f === "icao"} />
+                <FieldLabel>{f} {f === "icao" && "*"}</FieldLabel>
+                <TextInput
+                  value={form[f]}
+                  onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))}
+                  placeholder={`Enter ${f}`}
+                  required={f === "icao"}
+                />
               </div>
             ))}
             <div>
-              <label style={labelStyle}>OPERATOR</label>
-              <select value={form.operator_id} onChange={e => setForm(p => ({ ...p, operator_id: e.target.value }))}>
-                <option value="">— Select operator —</option>
+              <FieldLabel>Operator</FieldLabel>
+              <SelectInput value={form.operator_id} onChange={e => setForm(p => ({ ...p, operator_id: e.target.value }))}>
+                <option value="">- Select operator -</option>
                 {operators.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
+              </SelectInput>
             </div>
             <div>
-              <label style={labelStyle}>CATEGORY</label>
-              <select value={form.category_id} onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}>
-                <option value="">— Select category —</option>
+              <FieldLabel>Category</FieldLabel>
+              <SelectInput value={form.category_id} onChange={e => setForm(p => ({ ...p, category_id: e.target.value }))}>
+                <option value="">- Select category -</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              </SelectInput>
             </div>
           </div>
-          <div style={{ marginBottom: 16 }}>
-            <label style={labelStyle}>NOTE</label>
-            <textarea value={form.note} onChange={e => setForm(p => ({ ...p, note: e.target.value }))} placeholder="Optional note..." rows={2} style={{ resize: "vertical" }} />
+          <div className="mb-4">
+            <FieldLabel>Note</FieldLabel>
+            <TextareaInput
+              value={form.note}
+              onChange={e => setForm(p => ({ ...p, note: e.target.value }))}
+              placeholder="Optional note..."
+              rows={2}
+              className="resize-y"
+            />
           </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button type="submit" disabled={saving} style={{ padding: "9px 24px", background: saving ? "transparent" : "var(--green-ghost)", border: "1px solid var(--border-active)", color: "var(--green-bright)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", cursor: saving ? "default" : "pointer" }}>
-              {saving ? "◌ SAVING..." : editing ? "✓ UPDATE AIRCRAFT" : "✦ CREATE AIRCRAFT"}
-            </button>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={saving}>
+              {saving ? "SAVING..." : editing ? "UPDATE AIRCRAFT" : "CREATE AIRCRAFT"}
+            </Button>
             {editing && (
-              <button type="button" onClick={resetForm} style={{ padding: "9px 20px", background: "transparent", border: "1px solid var(--border-dim)", color: "var(--text-secondary)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", cursor: "pointer" }}>
-                ✕ CANCEL
-              </button>
+              <Button type="button" variant="secondary" onClick={resetForm}>
+                CANCEL
+              </Button>
             )}
           </div>
         </form>
+      </Panel>
+
+      <div className="mb-3 text-xs tracking-[0.08em] text-ops-secondary">
+        {aircraft.length} AIRCRAFT IN DATABASE
       </div>
 
-      <div style={{ marginBottom: 12 }}>
-        <span style={{ color: "var(--text-secondary)", fontSize: 12, letterSpacing: "0.08em" }}>{aircraft.length} AIRCRAFT IN DATABASE</span>
-      </div>
-
-      <div style={{ background: "var(--bg-panel)", border: "1px solid var(--border-dim)", borderRadius: 4, overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }} className="scrollbar-thin">
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 700 }}>
+      <Panel>
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full min-w-[700px] border-collapse">
             <thead>
-              <tr style={{ background: "var(--bg-surface)" }}>
+              <tr className="bg-ops-surface">
                 {["ID", "ICAO", "REG", "TYPE", "AIRFRAME", "SERIAL", "OPERATOR", "CATEGORY", "ACTIONS"].map(h => (
-                  <th key={h} style={{ padding: "9px 12px", textAlign: "left", color: "var(--text-dim)", fontWeight: 400, fontSize: 10, letterSpacing: "0.15em", borderBottom: "1px solid var(--border-dim)", whiteSpace: "nowrap" }}>{h}</th>
+                  <TableHeaderCell key={h} className="whitespace-nowrap px-3 py-[9px]">
+                    {h}
+                  </TableHeaderCell>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} style={{ textAlign: "center", padding: 40, color: "var(--text-dim)" }}>◈ LOADING...</td></tr>
+                <EmptyTableState colSpan={9}>LOADING...</EmptyTableState>
               ) : aircraft.length === 0 ? (
-                <tr><td colSpan={9} style={{ textAlign: "center", padding: 40, color: "var(--text-dim)" }}>NO AIRCRAFT — ADD ONE ABOVE</td></tr>
+                <EmptyTableState colSpan={9}>NO AIRCRAFT - ADD ONE ABOVE</EmptyTableState>
               ) : aircraft.map(a => (
-                <tr key={a.id} style={{ borderBottom: "1px solid var(--border-dim)", background: editing === a.id ? "var(--green-ghost)" : "transparent" }}>
-                  <td style={{ padding: "8px 12px", color: "var(--text-dim)", fontSize: 11 }}>#{a.id}</td>
-                  <td style={{ padding: "8px 12px", color: "var(--green-bright)", fontWeight: 700 }}>{a.icao || "—"}</td>
-                  <td style={{ padding: "8px 12px" }}>{a.reg || "—"}</td>
-                  <td style={{ padding: "8px 12px" }}>{a.type || "—"}</td>
-                  <td style={{ padding: "8px 12px" }}>{a.airframe || "—"}</td>
-                  <td style={{ padding: "8px 12px", color: "var(--text-secondary)" }}>{a.serial || "—"}</td>
-                  <td style={{ padding: "8px 12px", color: "var(--text-secondary)" }}>{operators.find(o => o.id === a.operator_id)?.name || "—"}</td>
-                  <td style={{ padding: "8px 12px", color: "var(--text-secondary)" }}>{categories.find(c => c.id === a.category_id)?.name || "—"}</td>
-                  <td style={{ padding: "8px 12px" }}>
+                <tr
+                  key={a.id}
+                  className={cn("border-b border-ops-border", editing === a.id && "bg-ops-accentGhost")}
+                >
+                  <td className="px-3 py-2 text-[11px] text-ops-dim">#{a.id}</td>
+                  <td className="px-3 py-2 font-bold text-ops-accentMuted">{a.icao || "-"}</td>
+                  <td className="px-3 py-2">{a.reg || "-"}</td>
+                  <td className="px-3 py-2">{a.type || "-"}</td>
+                  <td className="px-3 py-2">{a.airframe || "-"}</td>
+                  <td className="px-3 py-2 text-ops-secondary">{a.serial || "-"}</td>
+                  <td className="px-3 py-2 text-ops-secondary">{operators.find(o => o.id === a.operator_id)?.name || "-"}</td>
+                  <td className="px-3 py-2 text-ops-secondary">{categories.find(c => c.id === a.category_id)?.name || "-"}</td>
+                  <td className="px-3 py-2">
                     {confirmDelete === a.id ? (
-                      <div style={{ display: "flex", gap: 4 }}>
-                        <button onClick={() => handleDelete(a.id)} style={{ padding: "3px 10px", background: "rgba(255,40,40,0.1)", border: "1px solid var(--red)", color: "var(--red)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" }}>CONFIRM</button>
-                        <button onClick={() => setConfirmDelete(null)} style={{ padding: "3px 8px", background: "transparent", border: "1px solid var(--border-dim)", color: "var(--text-secondary)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" }}>✕</button>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="danger" onClick={() => handleDelete(a.id)}>CONFIRM</Button>
+                        <Button size="sm" variant="secondary" onClick={() => setConfirmDelete(null)}>CANCEL</Button>
                       </div>
                     ) : (
-                      <div style={{ display: "flex", gap: 4 }}>
-                        <button onClick={() => handleEdit(a)} style={{ padding: "3px 10px", background: "transparent", border: "1px solid var(--border-dim)", color: "var(--text-secondary)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" }}>EDIT</button>
-                        <button onClick={() => setConfirmDelete(a.id)} style={{ padding: "3px 10px", background: "transparent", border: "1px solid rgba(255,64,64,0.3)", color: "var(--red)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 10, cursor: "pointer" }}>DEL</button>
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="secondary" onClick={() => handleEdit(a)}>EDIT</Button>
+                        <Button size="sm" variant="danger" onClick={() => setConfirmDelete(a.id)}>DEL</Button>
                       </div>
                     )}
                   </td>
@@ -180,7 +234,7 @@ export default function AircraftManager() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }

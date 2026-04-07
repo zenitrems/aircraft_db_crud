@@ -1,6 +1,15 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
-import { AircraftView } from "@/lib/types";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import type { AircraftView } from "@/lib/types";
+import {
+  Button,
+  EmptyTableState,
+  Panel,
+  SectionHeader,
+  TableHeaderCell,
+  TextInput,
+  cn,
+} from "@/components/ui";
 
 const COLS: { key: keyof AircraftView; label: string; width?: number }[] = [
   { key: "icao", label: "ICAO", width: 90 },
@@ -41,14 +50,14 @@ export default function FleetView() {
 
   const totalPages = Math.ceil(total / 20);
 
-  const handleSearch = (e: React.FormEvent) => {
+  const handleSearch = (e: FormEvent) => {
     e.preventDefault();
     setPage(1);
     setQuery(search);
   };
 
   const fmt = (v: unknown) => {
-    if (v == null || v === "") return <span style={{ color: "var(--text-dim)" }}>—</span>;
+    if (v == null || v === "") return <span className="text-ops-dim">-</span>;
     if (typeof v === "string" && v.includes("T")) {
       const d = new Date(v);
       if (!isNaN(d.getTime())) return d.toLocaleDateString("es-MX");
@@ -58,52 +67,69 @@ export default function FleetView() {
 
   return (
     <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-        <div>
-          <div style={{ fontFamily: "var(--display)", fontSize: 11, color: "var(--text-dim)", letterSpacing: "0.2em" }}>AIRCRAFT DATABASE</div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: "var(--text-primary)", marginTop: 2 }}>Fleet Registry</div>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={{ color: "var(--green-bright)", fontSize: 24, fontWeight: 700, fontFamily: "var(--display)" }}>{total.toLocaleString()}</span>
-          <span style={{ color: "var(--text-dim)", fontSize: 11 }}>AIRCRAFT</span>
-        </div>
-      </div>
+      <SectionHeader
+        eyebrow="AIRCRAFT DATABASE"
+        title="Fleet Registry"
+        meta={(
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-2xl font-bold text-ops-accentMuted">{total.toLocaleString()}</span>
+            <span className="text-[11px] text-ops-dim">AIRCRAFT</span>
+          </div>
+        )}
+      />
 
-      <form onSubmit={handleSearch} style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search ICAO, registration, type, operator..." style={{ maxWidth: 400 }} />
-        <button type="submit" style={{ padding: "8px 20px", background: "var(--green-ghost)", border: "1px solid var(--border-active)", color: "var(--green-bright)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", whiteSpace: "nowrap" }}>
-          ⌕ Search
-        </button>
+      <form onSubmit={handleSearch} className="mb-4 flex gap-2">
+        <TextInput
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search ICAO, registration, type, operator..."
+          className="max-w-[400px]"
+        />
+        <Button type="submit" className="whitespace-nowrap">
+          Search
+        </Button>
         {query && (
-          <button type="button" onClick={() => { setSearch(""); setQuery(""); setPage(1); }} style={{ padding: "8px 12px", background: "transparent", border: "1px solid var(--border-dim)", color: "var(--text-secondary)", borderRadius: 3, fontFamily: "var(--mono)", fontSize: 11 }}>
-            ✕ Clear
-          </button>
+          <Button type="button" variant="secondary" onClick={() => { setSearch(""); setQuery(""); setPage(1); }}>
+            Clear
+          </Button>
         )}
       </form>
 
-      <div style={{ background: "var(--bg-panel)", border: "1px solid var(--border-dim)", borderRadius: 4, overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }} className="scrollbar-thin">
-          <table style={{ width: "100%", borderCollapse: "collapse", tableLayout: "fixed" }}>
+      <Panel>
+        <div className="overflow-x-auto scrollbar-thin">
+          <table className="w-full table-fixed border-collapse">
             <colgroup>{COLS.map(c => <col key={c.key} style={{ width: c.width ?? "auto" }} />)}</colgroup>
             <thead>
-              <tr style={{ background: "var(--bg-surface)" }}>
+              <tr className="bg-ops-surface">
                 {COLS.map(col => (
-                  <th key={col.key} style={{ padding: "10px 12px", textAlign: "left", color: "var(--text-dim)", fontWeight: 400, fontSize: 10, letterSpacing: "0.15em", borderBottom: "1px solid var(--border-dim)", whiteSpace: "nowrap" }}>
+                  <TableHeaderCell key={col.key} className="whitespace-nowrap px-3 py-2.5">
                     {col.label}
-                  </th>
+                  </TableHeaderCell>
                 ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={COLS.length} style={{ textAlign: "center", padding: 40, color: "var(--text-dim)" }}>◈ LOADING...</td></tr>
+                <EmptyTableState colSpan={COLS.length}>LOADING...</EmptyTableState>
               ) : data.length === 0 ? (
-                <tr><td colSpan={COLS.length} style={{ textAlign: "center", padding: 40, color: "var(--text-dim)" }}>NO AIRCRAFT FOUND</td></tr>
+                <EmptyTableState colSpan={COLS.length}>NO AIRCRAFT FOUND</EmptyTableState>
               ) : data.map((row) => (
-                <tr key={row.id} onClick={() => setSelected(row === selected ? null : row)}
-                  style={{ borderBottom: "1px solid var(--border-dim)", cursor: "pointer", background: selected?.id === row.id ? "var(--green-ghost)" : "transparent" }}>
+                <tr
+                  key={row.id}
+                  onClick={() => setSelected(row === selected ? null : row)}
+                  className={cn(
+                    "cursor-pointer border-b border-ops-border",
+                    selected?.id === row.id && "bg-ops-accentGhost",
+                  )}
+                >
                   {COLS.map(col => (
-                    <td key={col.key} style={{ padding: "9px 12px", color: col.key === "icao" ? "var(--green-bright)" : "var(--text-primary)", fontWeight: col.key === "icao" ? 700 : 400, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <td
+                      key={col.key}
+                      className={cn(
+                        "overflow-hidden text-ellipsis whitespace-nowrap px-3 py-[9px]",
+                        col.key === "icao" ? "font-bold text-ops-accentMuted" : "text-ops-text",
+                      )}
+                    >
                       {fmt(row[col.key])}
                     </td>
                   ))}
@@ -113,38 +139,47 @@ export default function FleetView() {
           </table>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 16px", borderTop: "1px solid var(--border-dim)", background: "var(--bg-surface)" }}>
-          <span style={{ color: "var(--text-dim)", fontSize: 11 }}>PAGE {page} / {totalPages || 1} — {total} RECORDS</span>
-          <div style={{ display: "flex", gap: 4 }}>
+        <div className="flex items-center justify-between border-t border-ops-border bg-ops-surface px-4 py-2.5">
+          <span className="text-[11px] text-ops-dim">PAGE {page} / {totalPages || 1} - {total} RECORDS</span>
+          <div className="flex gap-1">
             {[
               { label: "«", onClick: () => setPage(1), disabled: page === 1 },
               { label: "‹", onClick: () => setPage(p => Math.max(1, p - 1)), disabled: page === 1 },
               { label: "›", onClick: () => setPage(p => Math.min(totalPages, p + 1)), disabled: page >= totalPages },
               { label: "»", onClick: () => setPage(totalPages), disabled: page >= totalPages },
             ].map(btn => (
-              <button key={btn.label} onClick={btn.onClick} disabled={btn.disabled} style={{ padding: "4px 10px", background: "transparent", border: "1px solid var(--border-dim)", color: btn.disabled ? "var(--text-dim)" : "var(--text-secondary)", borderRadius: 3, fontFamily: "var(--mono)", cursor: btn.disabled ? "default" : "pointer" }}>
+              <Button
+                key={btn.label}
+                type="button"
+                size="sm"
+                variant="secondary"
+                onClick={btn.onClick}
+                disabled={btn.disabled}
+              >
                 {btn.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
-      </div>
+      </Panel>
 
       {selected && (
-        <div style={{ marginTop: 16, background: "var(--bg-panel)", border: "1px solid var(--border-active)", borderRadius: 4, padding: 20 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ fontFamily: "var(--display)", fontSize: 13, color: "var(--green-bright)", letterSpacing: "0.1em" }}>◈ DETAIL — {selected.icao}</div>
-            <button onClick={() => setSelected(null)} style={{ background: "transparent", border: "none", color: "var(--text-dim)", fontSize: 16, cursor: "pointer" }}>✕</button>
+        <Panel className="mt-4 border-ops-active p-5">
+          <div className="mb-4 flex justify-between">
+            <div className="font-mono text-[13px] tracking-[0.1em] text-ops-accentMuted">DETAIL - {selected.icao}</div>
+            <button onClick={() => setSelected(null)} className="text-base text-ops-dim transition hover:text-ops-text">
+              Close
+            </button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
             {COLS.map(col => (
-              <div key={col.key} style={{ padding: "10px 14px", background: "var(--bg-surface)", borderRadius: 3 }}>
-                <div style={{ fontSize: 9, color: "var(--text-dim)", letterSpacing: "0.15em", marginBottom: 4 }}>{col.label}</div>
-                <div style={{ color: "var(--text-primary)" }}>{fmt(selected[col.key])}</div>
+              <div key={col.key} className="rounded-md bg-ops-surface px-3.5 py-2.5">
+                <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">{col.label}</div>
+                <div className="text-ops-text">{fmt(selected[col.key])}</div>
               </div>
             ))}
           </div>
-        </div>
+        </Panel>
       )}
     </div>
   );
