@@ -1,12 +1,6 @@
-"use client";
-import { useState } from "react";
-import AircraftManager from "@/components/AircraftManager";
 import FleetView from "@/components/FleetView";
-import { cn } from "@/components/ui";
 
 export default function Home() {
-  const [tab, setTab] = useState<"fleet" | "manage">("fleet");
-
   return (
     <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-50 flex h-14 items-center gap-8 border-b border-ops-border bg-[rgba(17,24,39,0.95)] px-6 backdrop-blur-xl">
@@ -23,22 +17,9 @@ export default function Home() {
           <span className="text-[11px] text-ops-dim">OPS CONSOLE</span>
         </div>
 
-        <nav className="flex gap-0.5">
-          {(["fleet", "manage"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={cn(
-                "border-b-2 px-5 py-2 font-mono text-[11px] uppercase tracking-[0.1em] transition",
-                tab === t
-                  ? "border-ops-accent bg-ops-accentGhost font-bold text-ops-text"
-                  : "border-transparent text-ops-secondary hover:bg-ops-accentGhost hover:text-ops-text",
-              )}
-            >
-              {t === "fleet" ? "Fleet View" : "Aircraft CRUD"}
-            </button>
-          ))}
-        </nav>
+        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-ops-secondary">
+          Unified fleet dashboard
+        </div>
 
         <div className="ml-auto flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full bg-ops-accent" />
@@ -47,7 +28,7 @@ export default function Home() {
       </header>
 
       <main className="flex-1 p-6">
-        {tab === "fleet" ? <FleetView /> : <AircraftManager />}
+        <FleetView />
       </main>
     </div>
   );
