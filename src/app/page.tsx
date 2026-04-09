@@ -17,14 +17,7 @@ export default function Home() {
           <span className="text-[11px] text-ops-dim">OPS CONSOLE</span>
         </div>
 
-        <div className="font-mono text-[11px] uppercase tracking-[0.12em] text-ops-secondary">
-          Unified fleet dashboard
-        </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <span className="h-1.5 w-1.5 rounded-full bg-ops-accent" />
-          <span className="font-mono text-[11px] tracking-[0.08em] text-ops-dim">ONLINE</span>
-        </div>
       </header>
 
       <main className="flex-1 p-6">
