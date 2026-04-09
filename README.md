@@ -43,3 +43,6 @@ src/
 | PUT | `/api/aircraft/:id` | Update aircraft |
 | DELETE | `/api/aircraft/:id` | Delete aircraft |
 
+## Database Schema
+
+![schema](aircraftdb.png)
