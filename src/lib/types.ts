@@ -37,3 +37,15 @@ export interface Category {
 }
 
 export type AircraftInput = Omit<Aircraft, "id" | "created_at">;
+
+export interface UnidentifiedAircraft {
+  id: number;
+  icao: string | null;
+  callsign: string | null;
+  airframe: string | null;
+  type: string | null;
+  note: string | null;
+  first_seen: string | null;
+}
+
+export type UnidentifiedAircraftInput = Omit<UnidentifiedAircraft, "id">;
