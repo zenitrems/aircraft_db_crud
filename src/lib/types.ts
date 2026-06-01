@@ -36,6 +36,8 @@ export interface Category {
   name: string;
 }
 
+export type CatalogInput = Pick<Operator, "name">;
+
 export type AircraftInput = Omit<Aircraft, "id" | "created_at">;
 
 export interface UnidentifiedAircraft {

@@ -2,11 +2,12 @@ import Link from "next/link";
 import { cn } from "@/components/ui";
 
 type AppHeaderProps = {
-  current: "dashboard" | "stats";
+  current: "dashboard" | "catalogs" | "stats";
 };
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", key: "dashboard" },
+  { href: "/catalogs", label: "Catalogs", key: "catalogs" },
   { href: "/stats", label: "Stats", key: "stats" },
 ] as const;
 
