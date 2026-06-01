@@ -279,12 +279,14 @@ export default function UnidentifiedAircraftView() {
       )}
 
       <SectionHeader
-        eyebrow="UNIDENTIFIED AIRCRAFT"
-        title="Unknown Contacts Dashboard"
+        eyebrow="Unidentified aircraft"
+        title="Unknown contacts"
         meta={(
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-2xl font-bold text-ops-accentMuted">{total.toLocaleString()}</span>
-            <span className="text-[11px] text-ops-dim">RECORDS</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-right">
+              <div className="font-mono text-xl font-semibold text-ops-text">{total.toLocaleString()}</div>
+              <div className="text-[10px] uppercase tracking-[0.12em] text-ops-dim">Records</div>
+            </div>
             <Button type="button" onClick={startCreate}>
               Nuevo registro
             </Button>
@@ -292,11 +294,11 @@ export default function UnidentifiedAircraftView() {
         )}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0">
           <Panel className="mb-4 p-4">
             <form onSubmit={handleFilterSubmit}>
-              <div className="mb-3 grid grid-cols-[minmax(260px,1.6fr)_repeat(auto-fit,minmax(150px,1fr))] gap-3">
+              <div className="mb-3 grid grid-cols-[minmax(240px,1.8fr)_repeat(auto-fit,minmax(140px,1fr))] gap-3">
                 <div>
                   <FieldLabel>Global search</FieldLabel>
                   <TextInput
@@ -350,7 +352,7 @@ export default function UnidentifiedAircraftView() {
                   <col style={{ width: 132 }} />
                 </colgroup>
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-ops-surface">
+                  <tr className="bg-ops-elevated">
                     {COLS.map(col => {
                       const isActive = sortBy === col.key;
                       return (
@@ -360,7 +362,7 @@ export default function UnidentifiedAircraftView() {
                             onClick={() => handleSort(col.key)}
                             className={cn(
                               "flex w-full items-center justify-between gap-2 font-mono uppercase tracking-[0.15em] transition",
-                              isActive ? "text-ops-accentMuted" : "text-ops-dim hover:text-ops-text",
+                              isActive ? "text-ops-text" : "text-ops-dim hover:text-ops-text",
                             )}
                             aria-label={`Sort by ${col.label}`}
                           >
@@ -383,7 +385,7 @@ export default function UnidentifiedAircraftView() {
                       key={row.id}
                       onClick={() => setSelected(row.id === selected?.id ? null : row)}
                       className={cn(
-                        "cursor-pointer border-b border-ops-border transition hover:bg-ops-surface",
+                        "cursor-pointer border-b border-ops-border transition hover:bg-ops-elevated",
                         selected?.id === row.id && "bg-ops-accentGhost",
                         editingId === row.id && "bg-ops-accentGhost",
                       )}
@@ -393,7 +395,7 @@ export default function UnidentifiedAircraftView() {
                           key={col.key}
                           className={cn(
                             "overflow-hidden text-ellipsis whitespace-nowrap px-3 py-[9px]",
-                            col.key === "icao" ? "font-bold text-ops-accentMuted" : "text-ops-text",
+                            col.key === "icao" ? "font-semibold text-ops-text" : "text-ops-text",
                             col.key === "id" && "font-mono text-[11px] text-ops-dim",
                             col.key === "note" && "text-ops-secondary",
                           )}
@@ -421,7 +423,7 @@ export default function UnidentifiedAircraftView() {
               </table>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ops-border bg-ops-surface px-4 py-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ops-border bg-ops-elevated px-4 py-2.5">
               <span className="text-[11px] text-ops-dim">
                 PAGE {page} / {totalPages} - {total} RECORDS - ORDER {String(sortBy).toUpperCase()} {sortDir.toUpperCase()}
               </span>
@@ -449,13 +451,13 @@ export default function UnidentifiedAircraftView() {
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-[72px] xl:self-start">
-          <Panel className={cn("p-5", editingId !== null && "border-ops-active")}>
+          <Panel className={cn("p-4", editingId !== null && "border-ops-active")}>
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
-                <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ops-dim">
+                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ops-dim">
                   {editingId ? `EDIT RECORD #${editingId}` : "NEW CONTACT"}
                 </div>
-                <div className="mt-1 text-lg font-bold text-ops-text">
+                <div className="mt-1 text-base font-semibold text-ops-text">
                   {editingId ? form.icao || form.callsign || "Editar contacto" : "Agregar contacto"}
                 </div>
               </div>
@@ -510,13 +512,13 @@ export default function UnidentifiedAircraftView() {
             </form>
           </Panel>
 
-          <Panel className={cn("p-5", selected && "border-ops-active")}>
+          <Panel className={cn("p-4", selected && "border-ops-active")}>
             {selected ? (
               <>
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
-                    <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ops-dim">SELECTED RECORD</div>
-                    <div className="mt-1 text-lg font-bold text-ops-accentMuted">
+                    <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ops-dim">SELECTED RECORD</div>
+                    <div className="mt-1 text-base font-semibold text-ops-text">
                       {selected.icao || selected.callsign || `#${selected.id}`}
                     </div>
                   </div>
@@ -534,14 +536,14 @@ export default function UnidentifiedAircraftView() {
                     ["AIRFRAME", selected.airframe || "-"],
                     ["FIRST SEEN", formatValue(selected.first_seen)],
                   ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-md bg-ops-surface px-3.5 py-2.5">
+                    <div key={String(label)} className="rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
                       <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">{label}</div>
                       <div className="overflow-hidden text-ellipsis whitespace-nowrap text-ops-text">{value}</div>
                     </div>
                   ))}
                 </div>
 
-                <div className="mb-4 rounded-md bg-ops-surface px-3.5 py-2.5">
+                <div className="mb-4 rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
                   <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">NOTE</div>
                   <div className="text-ops-secondary">{formatValue(selected.note)}</div>
                 </div>
