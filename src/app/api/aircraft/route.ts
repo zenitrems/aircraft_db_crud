@@ -2,10 +2,19 @@ import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { AircraftInput } from "@/lib/types";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
     const operators = await pool.query("SELECT * FROM core.operators ORDER BY name");
     const categories = await pool.query("SELECT * FROM core.categories ORDER BY name");
+
+    if (searchParams.get("lookups") === "1") {
+      return NextResponse.json({
+        operators: operators.rows,
+        categories: categories.rows,
+      });
+    }
+
     const aircraft = await pool.query("SELECT * FROM core.aircraft ORDER BY id DESC");
     return NextResponse.json({
       aircraft: aircraft.rows,

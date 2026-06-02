@@ -21,10 +21,10 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "border-ops-active bg-ops-accentGhost text-ops-accentMuted hover:border-ops-accent",
-  secondary: "border-ops-border bg-transparent text-ops-secondary hover:border-ops-active hover:text-ops-text",
-  ghost: "border-transparent bg-transparent text-ops-secondary hover:bg-ops-accentGhost hover:text-ops-text",
-  danger: "border-red-400/70 bg-red-400/10 text-ops-danger hover:bg-red-400/15",
+  primary: "border-ops-text bg-ops-text text-ops-panel hover:border-ops-accent hover:bg-ops-accent",
+  secondary: "border-ops-border bg-ops-panel text-ops-secondary hover:border-ops-text hover:text-ops-text",
+  ghost: "border-transparent bg-transparent text-ops-secondary hover:bg-ops-surface hover:text-ops-text",
+  danger: "border-red-500/30 bg-red-500/10 text-ops-danger hover:border-ops-danger",
 };
 
 const buttonSizes: Record<ButtonSize, string> = {
@@ -41,7 +41,7 @@ export function Button({
   return (
     <button
       className={cn(
-        "rounded-md border font-mono uppercase tracking-[0.1em] transition disabled:cursor-default disabled:opacity-50",
+        "rounded-md border font-mono uppercase tracking-[0.08em] transition disabled:cursor-default disabled:opacity-50",
         buttonVariants[variant],
         buttonSizes[size],
         className,
@@ -54,7 +54,7 @@ export function Button({
 export function Panel({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn("overflow-hidden rounded-lg border border-ops-border bg-ops-panel", className)}
+      className={cn("overflow-hidden rounded-md border border-ops-border bg-ops-panel shadow-sm", className)}
       {...props}
     />
   );
@@ -68,10 +68,10 @@ type SectionHeaderProps = {
 
 export function SectionHeader({ eyebrow, title, meta }: SectionHeaderProps) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-4">
+    <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
       <div>
-        <div className="font-mono text-[11px] tracking-[0.18em] text-ops-dim">{eyebrow}</div>
-        <div className="mt-0.5 text-xl font-bold text-ops-text">{title}</div>
+        <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ops-dim">{eyebrow}</div>
+        <div className="mt-1 text-2xl font-semibold leading-tight text-ops-text">{title}</div>
       </div>
       {meta}
     </div>
@@ -103,7 +103,7 @@ export function TableHeaderCell({ className, ...props }: HTMLAttributes<HTMLTabl
   return (
     <th
       className={cn(
-        "border-b border-ops-border px-3 py-2.5 text-left text-[10px] font-normal tracking-[0.15em] text-ops-dim",
+        "border-b border-ops-border px-3 py-2.5 text-left text-[10px] font-medium tracking-[0.12em] text-ops-dim",
         className,
       )}
       {...props}

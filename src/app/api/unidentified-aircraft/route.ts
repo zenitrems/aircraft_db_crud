@@ -1,29 +1,24 @@
 import { NextResponse } from "next/server";
 import { pool } from "@/lib/db";
+import type { UnidentifiedAircraftInput } from "@/lib/types";
 
 const SORT_COLUMNS = {
   id: "id",
   icao: "icao",
-  reg: "reg",
+  callsign: "callsign",
   type: "type",
   airframe: "airframe",
-  serial: "serial",
-  operator_name: "operator_name",
-  category_name: "category_name",
   note: "note",
-  created_at: "created_at",
+  first_seen: "first_seen",
 } as const;
 
 const FILTER_COLUMNS = {
   icao: "icao",
-  reg: "reg",
+  callsign: "callsign",
   type: "type",
   airframe: "airframe",
-  serial: "serial",
-  operator_name: "operator_name",
-  category_name: "category_name",
   note: "note",
-  created_at: "TO_CHAR(created_at, 'YYYY-MM-DD')",
+  first_seen: "TO_CHAR(first_seen, 'YYYY-MM-DD HH24:MI:SS')",
 } as const;
 
 export async function GET(request: Request) {
@@ -32,8 +27,8 @@ export async function GET(request: Request) {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
   const limit = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") ?? "20", 10) || 20));
   const offset = (page - 1) * limit;
-  const requestedSortBy = searchParams.get("sortBy") ?? "id";
-  const sortBy = requestedSortBy in SORT_COLUMNS ? requestedSortBy as keyof typeof SORT_COLUMNS : "id";
+  const requestedSortBy = searchParams.get("sortBy") ?? "first_seen";
+  const sortBy = requestedSortBy in SORT_COLUMNS ? requestedSortBy as keyof typeof SORT_COLUMNS : "first_seen";
   const sortDir = searchParams.get("sortDir") === "asc" ? "ASC" : "DESC";
 
   try {
@@ -50,7 +45,7 @@ export async function GET(request: Request) {
       params.push(`%${search.trim()}%`);
       const idx = params.length;
       whereParts.push(
-        `(icao ILIKE $${idx} OR reg ILIKE $${idx} OR type ILIKE $${idx} OR airframe ILIKE $${idx} OR serial ILIKE $${idx} OR operator_name ILIKE $${idx} OR category_name ILIKE $${idx} OR note ILIKE $${idx} OR TO_CHAR(created_at, 'YYYY-MM-DD') ILIKE $${idx})`
+        `(icao ILIKE $${idx} OR callsign ILIKE $${idx} OR type ILIKE $${idx} OR airframe ILIKE $${idx} OR note ILIKE $${idx} OR TO_CHAR(first_seen, 'YYYY-MM-DD HH24:MI:SS') ILIKE $${idx})`
       );
     }
 
@@ -64,12 +59,13 @@ export async function GET(request: Request) {
     const offsetParam = params.push(offset);
 
     const countResult = await pool.query(
-      `SELECT COUNT(*) FROM core.aircraft_view ${whereClause}`,
-      countParams
+      `SELECT COUNT(*) FROM core.unidentified_aircraft ${whereClause}`,
+      countParams,
     );
+
     const result = await pool.query(
-      `SELECT * FROM core.aircraft_view ${whereClause} ORDER BY ${SORT_COLUMNS[sortBy]} ${sortDir} NULLS LAST LIMIT $${limitParam} OFFSET $${offsetParam}`,
-      params
+      `SELECT * FROM core.unidentified_aircraft ${whereClause} ORDER BY ${SORT_COLUMNS[sortBy]} ${sortDir} NULLS LAST LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      params,
     );
 
     return NextResponse.json({
@@ -80,6 +76,31 @@ export async function GET(request: Request) {
       sortBy,
       sortDir: sortDir.toLowerCase(),
     });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body: UnidentifiedAircraftInput = await request.json();
+    const { icao, callsign, airframe, type, note, first_seen } = body;
+
+    const result = await pool.query(
+      `INSERT INTO core.unidentified_aircraft (icao, callsign, airframe, type, note, first_seen)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [
+        icao?.trim() || null,
+        callsign?.trim() || null,
+        airframe?.trim() || null,
+        type?.trim() || null,
+        note?.trim() || null,
+        first_seen || null,
+      ],
+    );
+
+    return NextResponse.json(result.rows[0], { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Database error" }, { status: 500 });

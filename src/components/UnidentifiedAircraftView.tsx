@@ -1,119 +1,128 @@
 "use client";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import type { AircraftView, Category, Operator } from "@/lib/types";
+import type { UnidentifiedAircraft } from "@/lib/types";
 import {
   Button,
   EmptyTableState,
   FieldLabel,
   Panel,
   SectionHeader,
-  SelectInput,
   TableHeaderCell,
   TextareaInput,
   TextInput,
+  SelectInput,
   cn,
 } from "@/components/ui";
 
-type SortKey = "id" | keyof AircraftView;
+type SortKey = "id" | keyof UnidentifiedAircraft;
 type SortDir = "asc" | "desc";
-type FilterKey = "icao" | "reg" | "type" | "airframe" | "serial" | "operator_name" | "category_name" | "note" | "created_at";
+type FilterKey = "icao" | "callsign" | "type" | "airframe" | "note" | "first_seen";
 
-const COLS: { key: SortKey; label: string; width?: number; align?: "left" | "right" }[] = [
+const COLS: Array<{ key: SortKey; label: string; width?: number }> = [
   { key: "id", label: "ID", width: 74 },
-  { key: "icao", label: "ICAO", width: 100 },
-  { key: "reg", label: "REG", width: 110 },
-  { key: "type", label: "TYPE", width: 130 },
-  { key: "airframe", label: "AIRFRAME", width: 150 },
-  { key: "serial", label: "SERIAL", width: 130 },
-  { key: "operator_name", label: "OPERATOR", width: 180 },
-  { key: "category_name", label: "CATEGORY", width: 140 },
-  { key: "note", label: "NOTE", width: 260 },
-  { key: "created_at", label: "ADDED", width: 140 },
+  { key: "icao", label: "ICAO", width: 120 },
+  { key: "callsign", label: "CALLSIGN", width: 160 },
+  { key: "type", label: "TYPE", width: 150 },
+  { key: "airframe", label: "AIRFRAME", width: 160 },
+  { key: "note", label: "NOTE", width: 280 },
+  { key: "first_seen", label: "FIRST SEEN", width: 180 },
 ];
 
-const FILTERS: { key: FilterKey; label: string; placeholder: string }[] = [
+const FILTERS: Array<{ key: FilterKey; label: string; placeholder: string }> = [
   { key: "icao", label: "ICAO", placeholder: "icao" },
-  { key: "reg", label: "REG", placeholder: "registration" },
-  { key: "type", label: "TYPE", placeholder: "type" },
-  { key: "airframe", label: "AIRFRAME", placeholder: "airframe" },
-  { key: "serial", label: "SERIAL", placeholder: "serial" },
-  { key: "operator_name", label: "OPERATOR", placeholder: "operator" },
-  { key: "category_name", label: "CATEGORY", placeholder: "category" },
-  { key: "note", label: "NOTE", placeholder: "note" },
-  { key: "created_at", label: "ADDED", placeholder: "YYYY-MM-DD" },
+  { key: "callsign", label: "Callsign", placeholder: "callsign" },
+  { key: "type", label: "Type", placeholder: "type" },
+  { key: "airframe", label: "Airframe", placeholder: "airframe" },
+  { key: "note", label: "Note", placeholder: "note" },
+  { key: "first_seen", label: "First seen", placeholder: "YYYY-MM-DD" },
 ];
 
 const EMPTY_FILTERS: Record<FilterKey, string> = {
   icao: "",
-  reg: "",
+  callsign: "",
   type: "",
   airframe: "",
-  serial: "",
-  operator_name: "",
-  category_name: "",
   note: "",
-  created_at: "",
+  first_seen: "",
 };
 
 const EMPTY_FORM = {
   icao: "",
-  reg: "",
-  serial: "",
+  callsign: "",
   airframe: "",
   type: "",
-  operator_id: "",
-  category_id: "",
   note: "",
+  first_seen: "",
 };
 
-type AircraftFormData = typeof EMPTY_FORM;
+type UnidentifiedAircraftFormData = typeof EMPTY_FORM;
 
-const FORM_FIELDS: Array<{ key: keyof Pick<AircraftFormData, "icao" | "reg" | "serial" | "airframe" | "type">; label: string; required?: boolean; placeholder: string }> = [
-  { key: "icao", label: "ICAO", required: true, placeholder: "Required ICAO code" },
-  { key: "reg", label: "Registration", placeholder: "Tail / registration" },
-  { key: "type", label: "Type", placeholder: "Aircraft type" },
-  { key: "airframe", label: "Airframe", placeholder: "Airframe family" },
-  { key: "serial", label: "Serial", placeholder: "Manufacturer serial" },
+const FORM_FIELDS: Array<{
+  key: keyof Pick<UnidentifiedAircraftFormData, "icao" | "callsign" | "type" | "airframe">;
+  label: string;
+  placeholder: string;
+}> = [
+  { key: "icao", label: "ICAO", placeholder: "Hex / ICAO code" },
+  { key: "callsign", label: "Callsign", placeholder: "Observed callsign" },
+  { key: "type", label: "Type", placeholder: "Observed type" },
+  { key: "airframe", label: "Airframe", placeholder: "Observed airframe" },
 ];
 
-function rowToForm(row: AircraftView): AircraftFormData {
+function rowToForm(row: UnidentifiedAircraft): UnidentifiedAircraftFormData {
   return {
     icao: row.icao ?? "",
-    reg: row.reg ?? "",
-    serial: row.serial ?? "",
+    callsign: row.callsign ?? "",
     airframe: row.airframe ?? "",
     type: row.type ?? "",
-    operator_id: row.operator_id == null ? "" : String(row.operator_id),
-    category_id: row.category_id == null ? "" : String(row.category_id),
     note: row.note ?? "",
+    first_seen: toDateTimeInput(row.first_seen),
   };
+}
+
+function toDateTimeInput(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return localDate.toISOString().slice(0, 16);
+}
+
+function formatValue(value: unknown) {
+  if (value == null || value === "") return <span className="text-ops-dim">-</span>;
+  if (typeof value === "string" && value.includes("T")) {
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleString("es-MX", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+  }
+  return String(value);
 }
 
 function adsbxIcaoUrl(icao: string) {
   return `https://globe.adsbexchange.com/?icao=${encodeURIComponent(icao.trim())}`;
 }
 
-function adsbxIcaoListUrl(icaos: string[]) {
-  const uniqueIcaos = Array.from(new Set(icaos.map(icao => icao.trim()).filter(Boolean)));
-  return `https://globe.adsbexchange.com/?icao=${uniqueIcaos.map(encodeURIComponent).join(",")}`;
-}
-
-export default function FleetView() {
-  const [data, setData] = useState<AircraftView[]>([]);
+export default function UnidentifiedAircraftView() {
+  const [data, setData] = useState<UnidentifiedAircraft[]>([]);
   const [total, setTotal] = useState(0);
-  const [operators, setOperators] = useState<Operator[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Record<FilterKey, string>>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<Record<FilterKey, string>>(EMPTY_FILTERS);
-  const [sortBy, setSortBy] = useState<SortKey>("id");
+  const [sortBy, setSortBy] = useState<SortKey>("first_seen");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<AircraftView | null>(null);
-  const [form, setForm] = useState<AircraftFormData>(EMPTY_FORM);
+  const [selected, setSelected] = useState<UnidentifiedAircraft | null>(null);
+  const [form, setForm] = useState<UnidentifiedAircraftFormData>(EMPTY_FORM);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
@@ -143,38 +152,24 @@ export default function FleetView() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/aircraft-view?${queryString}`);
-      if (!res.ok) throw new Error("Failed to load aircraft view");
+      const res = await fetch(`/api/unidentified-aircraft?${queryString}`);
+      if (!res.ok) throw new Error("Failed to load unidentified aircraft");
       const json = await res.json();
       setData(json.data ?? []);
       setTotal(json.total ?? 0);
     } catch {
       setData([]);
       setTotal(0);
+      showToast("No se pudieron cargar los registros no identificados", "err");
     } finally {
       setLoading(false);
     }
-  }, [queryString]);
-
-  const fetchLookups = useCallback(async () => {
-    try {
-      const res = await fetch("/api/aircraft?lookups=1");
-      if (!res.ok) throw new Error("Failed to load lookup data");
-      const json = await res.json();
-      setOperators(json.operators ?? []);
-      setCategories(json.categories ?? []);
-    } catch {
-      showToast("No se pudieron cargar operadores/categorias", "err");
-    }
-  }, [showToast]);
+  }, [queryString, showToast]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { fetchLookups(); }, [fetchLookups]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const activeFilterCount = Object.values(appliedFilters).filter(value => value.trim()).length + (query.trim() ? 1 : 0);
-  const selectedOperator = selected?.operator_id == null ? null : operators.find(o => o.id === selected.operator_id);
-  const selectedCategory = selected?.category_id == null ? null : categories.find(c => c.id === selected.category_id);
 
   const handleFilterSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -195,7 +190,7 @@ export default function FleetView() {
     setSelected(null);
   };
 
-  const startEdit = (row: AircraftView) => {
+  const startEdit = (row: UnidentifiedAircraft) => {
     setForm(rowToForm(row));
     setEditingId(row.id);
     setSelected(row);
@@ -219,13 +214,13 @@ export default function FleetView() {
       return;
     }
     setSortBy(key);
-    setSortDir(key === "created_at" || key === "id" ? "desc" : "asc");
+    setSortDir(key === "first_seen" || key === "id" ? "desc" : "asc");
   };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!form.icao.trim()) {
-      showToast("ICAO es obligatorio", "err");
+    if (!form.icao.trim() && !form.callsign.trim()) {
+      showToast("Captura ICAO o callsign", "err");
       return;
     }
 
@@ -233,27 +228,26 @@ export default function FleetView() {
     try {
       const payload = {
         icao: form.icao.trim(),
-        reg: form.reg.trim(),
-        serial: form.serial.trim(),
+        callsign: form.callsign.trim(),
         airframe: form.airframe.trim(),
         type: form.type.trim(),
-        operator_id: form.operator_id ? Number(form.operator_id) : null,
-        category_id: form.category_id ? Number(form.category_id) : null,
         note: form.note.trim(),
+        first_seen: form.first_seen ? new Date(form.first_seen).toISOString() : null,
       };
-      const res = await fetch(editingId ? `/api/aircraft/${editingId}` : "/api/aircraft", {
+
+      const res = await fetch(editingId ? `/api/unidentified-aircraft/${editingId}` : "/api/unidentified-aircraft", {
         method: editingId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) throw new Error("Save failed");
-      showToast(editingId ? "Aeronave actualizada" : "Aeronave agregada");
+      showToast(editingId ? "Registro actualizado" : "Registro agregado");
       resetForm();
       setSelected(null);
       await fetchData();
     } catch {
-      showToast("No se pudo guardar la aeronave", "err");
+      showToast("No se pudo guardar el registro", "err");
     } finally {
       setSaving(false);
     }
@@ -261,53 +255,16 @@ export default function FleetView() {
 
   const handleDelete = async (id: number) => {
     try {
-      const res = await fetch(`/api/aircraft/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/unidentified-aircraft/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
-      showToast("Aeronave eliminada");
+      showToast("Registro eliminado");
       setConfirmDelete(null);
       if (selected?.id === id) setSelected(null);
       if (editingId === id) resetForm();
       await fetchData();
     } catch {
-      showToast("No se pudo eliminar la aeronave", "err");
+      showToast("No se pudo eliminar el registro", "err");
     }
-  };
-
-  const openOperatorIcaos = async (operatorId: number, operatorName: string) => {
-    const target = window.open("", "_blank");
-    if (target) target.opener = null;
-
-    try {
-      const res = await fetch(`/api/operators/${operatorId}`);
-      if (!res.ok) throw new Error("Failed to load operator ICAOs");
-      const json = await res.json();
-      const icaos = Array.isArray(json.icaos) ? json.icaos.filter((icao: unknown): icao is string => typeof icao === "string") : [];
-
-      if (icaos.length === 0) {
-        target?.close();
-        showToast(`${operatorName} no tiene ICAO registrados`, "err");
-        return;
-      }
-
-      const url = adsbxIcaoListUrl(icaos);
-      if (target) {
-        target.location.href = url;
-      } else {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
-    } catch {
-      target?.close();
-      showToast("No se pudieron cargar los ICAO del operador", "err");
-    }
-  };
-
-  const fmt = (v: unknown) => {
-    if (v == null || v === "") return <span className="text-ops-dim">-</span>;
-    if (typeof v === "string" && v.includes("T")) {
-      const d = new Date(v);
-      if (!isNaN(d.getTime())) return d.toLocaleDateString("es-MX");
-    }
-    return String(v);
   };
 
   return (
@@ -326,16 +283,16 @@ export default function FleetView() {
       )}
 
       <SectionHeader
-        eyebrow="Aircraft database"
-        title="Fleet"
+        eyebrow="Unidentified aircraft"
+        title="Unknown contacts"
         meta={(
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-right">
               <div className="font-mono text-xl font-semibold text-ops-text">{total.toLocaleString()}</div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-ops-dim">Aircraft</div>
+              <div className="text-[10px] uppercase tracking-[0.12em] text-ops-dim">Records</div>
             </div>
             <Button type="button" onClick={startCreate}>
-              Nueva aeronave
+              Nuevo registro
             </Button>
           </div>
         )}
@@ -351,7 +308,7 @@ export default function FleetView() {
                   <TextInput
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="Search across ICAO, registration, type, operator..."
+                    placeholder="Search across ICAO, callsign, type, airframe..."
                   />
                 </div>
                 {FILTERS.map(filter => (
@@ -395,7 +352,7 @@ export default function FleetView() {
             <div className="max-h-[720px] overflow-auto scrollbar-thin">
               <table className="w-full table-fixed border-collapse">
                 <colgroup>
-                  {COLS.map(c => <col key={c.key} style={{ width: c.width ?? "auto" }} />)}
+                  {COLS.map(col => <col key={col.key} style={{ width: col.width ?? "auto" }} />)}
                   <col style={{ width: 132 }} />
                 </colgroup>
                 <thead className="sticky top-0 z-10">
@@ -426,8 +383,8 @@ export default function FleetView() {
                   {loading ? (
                     <EmptyTableState colSpan={COLS.length + 1}>LOADING...</EmptyTableState>
                   ) : data.length === 0 ? (
-                    <EmptyTableState colSpan={COLS.length + 1}>NO AIRCRAFT FOUND</EmptyTableState>
-                  ) : data.map((row) => (
+                    <EmptyTableState colSpan={COLS.length + 1}>NO UNIDENTIFIED AIRCRAFT FOUND</EmptyTableState>
+                  ) : data.map(row => (
                     <tr
                       key={row.id}
                       onClick={() => setSelected(row.id === selected?.id ? null : row)}
@@ -446,7 +403,7 @@ export default function FleetView() {
                             col.key === "id" && "font-mono text-[11px] text-ops-dim",
                             col.key === "note" && "text-ops-secondary",
                           )}
-                          title={String(row[col.key as keyof AircraftView] ?? "")}
+                          title={String(row[col.key as keyof UnidentifiedAircraft] ?? "")}
                         >
                           {col.key === "id" ? (
                             `#${row.id}`
@@ -461,20 +418,8 @@ export default function FleetView() {
                             >
                               {row.icao}
                             </a>
-                          ) : col.key === "operator_name" && row.operator_id && row.operator_name ? (
-                            <button
-                              type="button"
-                              onClick={event => {
-                                event.stopPropagation();
-                                openOperatorIcaos(row.operator_id as number, row.operator_name as string);
-                              }}
-                              className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
-                              title={`Abrir todos los ICAO de ${row.operator_name} en ADSBExchange`}
-                            >
-                              {row.operator_name}
-                            </button>
                           ) : (
-                            fmt(row[col.key as keyof AircraftView])
+                            formatValue(row[col.key as keyof UnidentifiedAircraft])
                           )}
                         </td>
                       ))}
@@ -504,19 +449,19 @@ export default function FleetView() {
               <div className="flex gap-1">
                 {[
                   { label: "<<", onClick: () => setPage(1), disabled: page === 1 },
-                  { label: "<", onClick: () => setPage(p => Math.max(1, p - 1)), disabled: page === 1 },
-                  { label: ">", onClick: () => setPage(p => Math.min(totalPages, p + 1)), disabled: page >= totalPages },
+                  { label: "<", onClick: () => setPage(prev => Math.max(1, prev - 1)), disabled: page === 1 },
+                  { label: ">", onClick: () => setPage(prev => Math.min(totalPages, prev + 1)), disabled: page >= totalPages },
                   { label: ">>", onClick: () => setPage(totalPages), disabled: page >= totalPages },
-                ].map(btn => (
+                ].map(button => (
                   <Button
-                    key={btn.label}
+                    key={button.label}
                     type="button"
                     size="sm"
                     variant="secondary"
-                    onClick={btn.onClick}
-                    disabled={btn.disabled}
+                    onClick={button.onClick}
+                    disabled={button.disabled}
                   >
-                    {btn.label}
+                    {button.label}
                   </Button>
                 ))}
               </div>
@@ -529,10 +474,10 @@ export default function FleetView() {
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ops-dim">
-                  {editingId ? `EDIT RECORD #${editingId}` : "NEW AIRCRAFT"}
+                  {editingId ? `EDIT RECORD #${editingId}` : "NEW CONTACT"}
                 </div>
                 <div className="mt-1 text-base font-semibold text-ops-text">
-                  {editingId ? form.icao || "Editar aeronave" : "Agregar aeronave"}
+                  {editingId ? form.icao || form.callsign || "Editar contacto" : "Agregar contacto"}
                 </div>
               </div>
               <Button type="button" size="sm" variant="secondary" onClick={startCreate}>
@@ -544,38 +489,21 @@ export default function FleetView() {
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
                 {FORM_FIELDS.map(field => (
                   <div key={field.key}>
-                    <FieldLabel>{field.label} {field.required && "*"}</FieldLabel>
+                    <FieldLabel>{field.label}</FieldLabel>
                     <TextInput
                       value={form[field.key]}
                       onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
                       placeholder={field.placeholder}
-                      required={field.required}
                     />
                   </div>
                 ))}
                 <div>
-                  <FieldLabel>Operator</FieldLabel>
-                  <SelectInput
-                    value={form.operator_id}
-                    onChange={e => setForm(prev => ({ ...prev, operator_id: e.target.value }))}
-                  >
-                    <option value="">- Sin operador -</option>
-                    {operators.map(operator => (
-                      <option key={operator.id} value={operator.id}>{operator.name}</option>
-                    ))}
-                  </SelectInput>
-                </div>
-                <div>
-                  <FieldLabel>Category</FieldLabel>
-                  <SelectInput
-                    value={form.category_id}
-                    onChange={e => setForm(prev => ({ ...prev, category_id: e.target.value }))}
-                  >
-                    <option value="">- Sin categoria -</option>
-                    {categories.map(category => (
-                      <option key={category.id} value={category.id}>{category.name}</option>
-                    ))}
-                  </SelectInput>
+                  <FieldLabel>First seen</FieldLabel>
+                  <TextInput
+                    type="datetime-local"
+                    value={form.first_seen}
+                    onChange={e => setForm(prev => ({ ...prev, first_seen: e.target.value }))}
+                  />
                 </div>
               </div>
 
@@ -584,7 +512,7 @@ export default function FleetView() {
                 <TextareaInput
                   value={form.note}
                   onChange={e => setForm(prev => ({ ...prev, note: e.target.value }))}
-                  placeholder="Nota operativa, observaciones o estado..."
+                  placeholder="Observaciones operativas del contacto..."
                   rows={4}
                   className="resize-y"
                 />
@@ -620,11 +548,11 @@ export default function FleetView() {
                           {selected.icao}
                         </a>
                       ) : (
-                        `#${selected.id}`
+                        selected.callsign || `#${selected.id}`
                       )}
                     </div>
                   </div>
-                  <button onClick={() => setSelected(null)} className="text-base text-ops-dim transition hover:text-ops-text">
+                  <button type="button" onClick={() => setSelected(null)} className="text-base text-ops-dim transition hover:text-ops-text">
                     Close
                   </button>
                 </div>
@@ -632,38 +560,21 @@ export default function FleetView() {
                 <div className="mb-4 grid grid-cols-2 gap-2">
                   {[
                     ["ID", `#${selected.id}`],
-                    ["REG", selected.reg || "-"],
+                    ["CALLSIGN", selected.callsign || "-"],
                     ["TYPE", selected.type || "-"],
                     ["AIRFRAME", selected.airframe || "-"],
-                    ["SERIAL", selected.serial || "-"],
-                    ["CATEGORY", selectedCategory?.name ?? selected.category_name ?? "-"],
-                    ["ADDED", fmt(selected.created_at)],
+                    ["FIRST SEEN", formatValue(selected.first_seen)],
                   ].map(([label, value]) => (
                     <div key={String(label)} className="rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
                       <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">{label}</div>
                       <div className="overflow-hidden text-ellipsis whitespace-nowrap text-ops-text">{value}</div>
                     </div>
                   ))}
-                  <div className="rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
-                    <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">OPERATOR</div>
-                    {selected.operator_id && (selectedOperator?.name || selected.operator_name) ? (
-                      <button
-                        type="button"
-                        onClick={() => openOperatorIcaos(selected.operator_id as number, selectedOperator?.name ?? selected.operator_name ?? "operador")}
-                        className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
-                        title={`Abrir todos los ICAO de ${selectedOperator?.name ?? selected.operator_name} en ADSBExchange`}
-                      >
-                        {selectedOperator?.name ?? selected.operator_name}
-                      </button>
-                    ) : (
-                      <div className="text-ops-text">-</div>
-                    )}
-                  </div>
                 </div>
 
                 <div className="mb-4 rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
                   <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">NOTE</div>
-                  <div className="text-ops-secondary">{fmt(selected.note)}</div>
+                  <div className="text-ops-secondary">{formatValue(selected.note)}</div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -688,7 +599,7 @@ export default function FleetView() {
               </>
             ) : (
               <div className="py-6 text-center text-ops-dim">
-                Selecciona una fila para ver el detalle sin salir del dashboard.
+                Selecciona una fila para ver el detalle del contacto no identificado.
               </div>
             )}
           </Panel>

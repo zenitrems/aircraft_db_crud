@@ -140,7 +140,7 @@ export default function AircraftManager() {
                   value={form[f]}
                   onChange={e => setForm(p => ({ ...p, [f]: e.target.value }))}
                   placeholder={`Enter ${f}`}
-                  required={f === "icao"}
+                //required={f === "icao"}
                 />
               </div>
             ))}
