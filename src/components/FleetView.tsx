@@ -89,6 +89,15 @@ function rowToForm(row: AircraftView): AircraftFormData {
   };
 }
 
+function adsbxIcaoUrl(icao: string) {
+  return `https://globe.adsbexchange.com/?icao=${encodeURIComponent(icao.trim())}`;
+}
+
+function adsbxIcaoListUrl(icaos: string[]) {
+  const uniqueIcaos = Array.from(new Set(icaos.map(icao => icao.trim()).filter(Boolean)));
+  return `https://globe.adsbexchange.com/?icao=${uniqueIcaos.map(encodeURIComponent).join(",")}`;
+}
+
 export default function FleetView() {
   const [data, setData] = useState<AircraftView[]>([]);
   const [total, setTotal] = useState(0);
@@ -264,6 +273,34 @@ export default function FleetView() {
     }
   };
 
+  const openOperatorIcaos = async (operatorId: number, operatorName: string) => {
+    const target = window.open("", "_blank");
+    if (target) target.opener = null;
+
+    try {
+      const res = await fetch(`/api/operators/${operatorId}`);
+      if (!res.ok) throw new Error("Failed to load operator ICAOs");
+      const json = await res.json();
+      const icaos = Array.isArray(json.icaos) ? json.icaos.filter((icao: unknown): icao is string => typeof icao === "string") : [];
+
+      if (icaos.length === 0) {
+        target?.close();
+        showToast(`${operatorName} no tiene ICAO registrados`, "err");
+        return;
+      }
+
+      const url = adsbxIcaoListUrl(icaos);
+      if (target) {
+        target.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      target?.close();
+      showToast("No se pudieron cargar los ICAO del operador", "err");
+    }
+  };
+
   const fmt = (v: unknown) => {
     if (v == null || v === "") return <span className="text-ops-dim">-</span>;
     if (typeof v === "string" && v.includes("T")) {
@@ -411,7 +448,34 @@ export default function FleetView() {
                           )}
                           title={String(row[col.key as keyof AircraftView] ?? "")}
                         >
-                          {col.key === "id" ? `#${row.id}` : fmt(row[col.key as keyof AircraftView])}
+                          {col.key === "id" ? (
+                            `#${row.id}`
+                          ) : col.key === "icao" && row.icao ? (
+                            <a
+                              href={adsbxIcaoUrl(row.icao)}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={event => event.stopPropagation()}
+                              className="text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
+                              title={`Abrir ${row.icao} en ADSBExchange`}
+                            >
+                              {row.icao}
+                            </a>
+                          ) : col.key === "operator_name" && row.operator_id && row.operator_name ? (
+                            <button
+                              type="button"
+                              onClick={event => {
+                                event.stopPropagation();
+                                openOperatorIcaos(row.operator_id as number, row.operator_name as string);
+                              }}
+                              className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
+                              title={`Abrir todos los ICAO de ${row.operator_name} en ADSBExchange`}
+                            >
+                              {row.operator_name}
+                            </button>
+                          ) : (
+                            fmt(row[col.key as keyof AircraftView])
+                          )}
                         </td>
                       ))}
                       <td className="px-3 py-[9px]" onClick={e => e.stopPropagation()}>
@@ -545,7 +609,20 @@ export default function FleetView() {
                 <div className="mb-4 flex items-start justify-between gap-3">
                   <div>
                     <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ops-dim">SELECTED RECORD</div>
-                    <div className="mt-1 text-base font-semibold text-ops-text">{selected.icao || `#${selected.id}`}</div>
+                    <div className="mt-1 text-base font-semibold text-ops-text">
+                      {selected.icao ? (
+                        <a
+                          href={adsbxIcaoUrl(selected.icao)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
+                        >
+                          {selected.icao}
+                        </a>
+                      ) : (
+                        `#${selected.id}`
+                      )}
+                    </div>
                   </div>
                   <button onClick={() => setSelected(null)} className="text-base text-ops-dim transition hover:text-ops-text">
                     Close
@@ -559,7 +636,6 @@ export default function FleetView() {
                     ["TYPE", selected.type || "-"],
                     ["AIRFRAME", selected.airframe || "-"],
                     ["SERIAL", selected.serial || "-"],
-                    ["OPERATOR", selectedOperator?.name ?? selected.operator_name ?? "-"],
                     ["CATEGORY", selectedCategory?.name ?? selected.category_name ?? "-"],
                     ["ADDED", fmt(selected.created_at)],
                   ].map(([label, value]) => (
@@ -568,6 +644,21 @@ export default function FleetView() {
                       <div className="overflow-hidden text-ellipsis whitespace-nowrap text-ops-text">{value}</div>
                     </div>
                   ))}
+                  <div className="rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
+                    <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">OPERATOR</div>
+                    {selected.operator_id && (selectedOperator?.name || selected.operator_name) ? (
+                      <button
+                        type="button"
+                        onClick={() => openOperatorIcaos(selected.operator_id as number, selectedOperator?.name ?? selected.operator_name ?? "operador")}
+                        className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
+                        title={`Abrir todos los ICAO de ${selectedOperator?.name ?? selected.operator_name} en ADSBExchange`}
+                      >
+                        {selectedOperator?.name ?? selected.operator_name}
+                      </button>
+                    ) : (
+                      <div className="text-ops-text">-</div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="mb-4 rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">

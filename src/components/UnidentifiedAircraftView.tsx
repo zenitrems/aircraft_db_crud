@@ -105,6 +105,10 @@ function formatValue(value: unknown) {
   return String(value);
 }
 
+function adsbxIcaoUrl(icao: string) {
+  return `https://globe.adsbexchange.com/?icao=${encodeURIComponent(icao.trim())}`;
+}
+
 export default function UnidentifiedAircraftView() {
   const [data, setData] = useState<UnidentifiedAircraft[]>([]);
   const [total, setTotal] = useState(0);
@@ -401,7 +405,22 @@ export default function UnidentifiedAircraftView() {
                           )}
                           title={String(row[col.key as keyof UnidentifiedAircraft] ?? "")}
                         >
-                          {col.key === "id" ? `#${row.id}` : formatValue(row[col.key as keyof UnidentifiedAircraft])}
+                          {col.key === "id" ? (
+                            `#${row.id}`
+                          ) : col.key === "icao" && row.icao ? (
+                            <a
+                              href={adsbxIcaoUrl(row.icao)}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={event => event.stopPropagation()}
+                              className="text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
+                              title={`Abrir ${row.icao} en ADSBExchange`}
+                            >
+                              {row.icao}
+                            </a>
+                          ) : (
+                            formatValue(row[col.key as keyof UnidentifiedAircraft])
+                          )}
                         </td>
                       ))}
                       <td className="px-3 py-[9px]" onClick={e => e.stopPropagation()}>
@@ -519,7 +538,18 @@ export default function UnidentifiedAircraftView() {
                   <div>
                     <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ops-dim">SELECTED RECORD</div>
                     <div className="mt-1 text-base font-semibold text-ops-text">
-                      {selected.icao || selected.callsign || `#${selected.id}`}
+                      {selected.icao ? (
+                        <a
+                          href={adsbxIcaoUrl(selected.icao)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
+                        >
+                          {selected.icao}
+                        </a>
+                      ) : (
+                        selected.callsign || `#${selected.id}`
+                      )}
                     </div>
                   </div>
                   <button type="button" onClick={() => setSelected(null)} className="text-base text-ops-dim transition hover:text-ops-text">
@@ -530,7 +560,6 @@ export default function UnidentifiedAircraftView() {
                 <div className="mb-4 grid grid-cols-2 gap-2">
                   {[
                     ["ID", `#${selected.id}`],
-                    ["ICAO", selected.icao || "-"],
                     ["CALLSIGN", selected.callsign || "-"],
                     ["TYPE", selected.type || "-"],
                     ["AIRFRAME", selected.airframe || "-"],

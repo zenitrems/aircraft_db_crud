@@ -15,7 +15,19 @@ export async function GET(_: Request, { params }: RouteContext) {
     if (result.rows.length === 0) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-    return NextResponse.json(result.rows[0]);
+
+    const aircraftResult = await pool.query(
+      `SELECT DISTINCT TRIM(icao) AS icao
+       FROM core.aircraft
+       WHERE operator_id = $1 AND NULLIF(TRIM(icao), '') IS NOT NULL
+       ORDER BY icao`,
+      [id],
+    );
+
+    return NextResponse.json({
+      ...result.rows[0],
+      icaos: aircraftResult.rows.map(row => row.icao),
+    });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Database error" }, { status: 500 });
