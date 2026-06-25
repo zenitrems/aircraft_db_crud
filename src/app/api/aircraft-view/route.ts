@@ -5,7 +5,6 @@ const SORT_COLUMNS = {
   id: "id",
   icao: "icao",
   reg: "reg",
-  type: "type",
   airframe: "airframe",
   serial: "serial",
   operator_name: "operator_name",
@@ -17,7 +16,6 @@ const SORT_COLUMNS = {
 const FILTER_COLUMNS = {
   icao: "icao",
   reg: "reg",
-  type: "type",
   airframe: "airframe",
   serial: "serial",
   operator_name: "operator_name",
@@ -25,6 +23,20 @@ const FILTER_COLUMNS = {
   note: "note",
   created_at: "TO_CHAR(created_at, 'YYYY-MM-DD')",
 } as const;
+
+const AIRCRAFT_VIEW_COLUMNS = [
+  "id",
+  "icao",
+  "reg",
+  "serial",
+  "airframe",
+  "operator_id",
+  "category_id",
+  "note",
+  "created_at",
+  "operator_name",
+  "category_name",
+].join(", ");
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -50,7 +62,7 @@ export async function GET(request: Request) {
       params.push(`%${search.trim()}%`);
       const idx = params.length;
       whereParts.push(
-        `(icao ILIKE $${idx} OR reg ILIKE $${idx} OR type ILIKE $${idx} OR airframe ILIKE $${idx} OR serial ILIKE $${idx} OR operator_name ILIKE $${idx} OR category_name ILIKE $${idx} OR note ILIKE $${idx} OR TO_CHAR(created_at, 'YYYY-MM-DD') ILIKE $${idx})`
+        `(icao ILIKE $${idx} OR reg ILIKE $${idx} OR airframe ILIKE $${idx} OR serial ILIKE $${idx} OR operator_name ILIKE $${idx} OR category_name ILIKE $${idx} OR note ILIKE $${idx} OR TO_CHAR(created_at, 'YYYY-MM-DD') ILIKE $${idx})`
       );
     }
 
@@ -68,7 +80,7 @@ export async function GET(request: Request) {
       countParams
     );
     const result = await pool.query(
-      `SELECT * FROM core.aircraft_view ${whereClause} ORDER BY ${SORT_COLUMNS[sortBy]} ${sortDir} NULLS LAST LIMIT $${limitParam} OFFSET $${offsetParam}`,
+      `SELECT ${AIRCRAFT_VIEW_COLUMNS} FROM core.aircraft_view ${whereClause} ORDER BY ${SORT_COLUMNS[sortBy]} ${sortDir} NULLS LAST LIMIT $${limitParam} OFFSET $${offsetParam}`,
       params
     );
 

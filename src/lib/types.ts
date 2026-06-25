@@ -4,7 +4,6 @@ export interface Aircraft {
   reg: string;
   serial: string;
   airframe: string;
-  type: string;
   operator_id: number | null;
   category_id: number | null;
   note: string | null;
@@ -17,7 +16,6 @@ export interface AircraftView {
   reg: string;
   serial: string;
   airframe: string;
-  type: string;
   operator_id: number | null;
   category_id: number | null;
   note: string | null;

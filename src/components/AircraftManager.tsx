@@ -14,7 +14,7 @@ import {
   cn,
 } from "@/components/ui";
 
-const EMPTY_FORM = { icao: "", reg: "", serial: "", airframe: "", type: "", operator_id: "", category_id: "", note: "" };
+const EMPTY_FORM = { icao: "", reg: "", serial: "", airframe: "", operator_id: "", category_id: "", note: "" };
 type FormData = typeof EMPTY_FORM;
 
 export default function AircraftManager() {
@@ -59,7 +59,6 @@ export default function AircraftManager() {
       reg: a.reg ?? "",
       serial: a.serial ?? "",
       airframe: a.airframe ?? "",
-      type: a.type ?? "",
       operator_id: a.operator_id?.toString() ?? "",
       category_id: a.category_id?.toString() ?? "",
       note: a.note ?? "",
@@ -133,7 +132,7 @@ export default function AircraftManager() {
         )}
         <form onSubmit={handleSubmit}>
           <div className="mb-4 grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-3">
-            {(["icao", "reg", "serial", "airframe", "type"] as const).map(f => (
+            {(["icao", "reg", "serial", "airframe"] as const).map(f => (
               <div key={f}>
                 <FieldLabel>{f} {f === "icao" && "*"}</FieldLabel>
                 <TextInput
@@ -191,7 +190,7 @@ export default function AircraftManager() {
           <table className="w-full min-w-[700px] border-collapse">
             <thead>
               <tr className="bg-ops-surface">
-                {["ID", "ICAO", "REG", "TYPE", "AIRFRAME", "SERIAL", "OPERATOR", "CATEGORY", "ACTIONS"].map(h => (
+                {["ID", "ICAO", "REG", "AIRFRAME", "SERIAL", "OPERATOR", "CATEGORY", "ACTIONS"].map(h => (
                   <TableHeaderCell key={h} className="whitespace-nowrap px-3 py-[9px]">
                     {h}
                   </TableHeaderCell>
@@ -200,9 +199,9 @@ export default function AircraftManager() {
             </thead>
             <tbody>
               {loading ? (
-                <EmptyTableState colSpan={9}>LOADING...</EmptyTableState>
+                <EmptyTableState colSpan={8}>LOADING...</EmptyTableState>
               ) : aircraft.length === 0 ? (
-                <EmptyTableState colSpan={9}>NO AIRCRAFT - ADD ONE ABOVE</EmptyTableState>
+                <EmptyTableState colSpan={8}>NO AIRCRAFT - ADD ONE ABOVE</EmptyTableState>
               ) : aircraft.map(a => (
                 <tr
                   key={a.id}
@@ -211,7 +210,6 @@ export default function AircraftManager() {
                   <td className="px-3 py-2 text-[11px] text-ops-dim">#{a.id}</td>
                   <td className="px-3 py-2 font-bold text-ops-accentMuted">{a.icao || "-"}</td>
                   <td className="px-3 py-2">{a.reg || "-"}</td>
-                  <td className="px-3 py-2">{a.type || "-"}</td>
                   <td className="px-3 py-2">{a.airframe || "-"}</td>
                   <td className="px-3 py-2 text-ops-secondary">{a.serial || "-"}</td>
                   <td className="px-3 py-2 text-ops-secondary">{operators.find(o => o.id === a.operator_id)?.name || "-"}</td>

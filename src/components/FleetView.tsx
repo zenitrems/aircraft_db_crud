@@ -16,13 +16,12 @@ import {
 
 type SortKey = "id" | keyof AircraftView;
 type SortDir = "asc" | "desc";
-type FilterKey = "icao" | "reg" | "type" | "airframe" | "serial" | "operator_name" | "category_name" | "note" | "created_at";
+type FilterKey = "icao" | "reg" | "airframe" | "serial" | "operator_name" | "category_name" | "note" | "created_at";
 
 const COLS: { key: SortKey; label: string; width?: number; align?: "left" | "right" }[] = [
   { key: "id", label: "ID", width: 74 },
   { key: "icao", label: "ICAO", width: 100 },
   { key: "reg", label: "REG", width: 110 },
-  { key: "type", label: "TYPE", width: 130 },
   { key: "airframe", label: "AIRFRAME", width: 150 },
   { key: "serial", label: "SERIAL", width: 130 },
   { key: "operator_name", label: "OPERATOR", width: 180 },
@@ -34,7 +33,6 @@ const COLS: { key: SortKey; label: string; width?: number; align?: "left" | "rig
 const FILTERS: { key: FilterKey; label: string; placeholder: string }[] = [
   { key: "icao", label: "ICAO", placeholder: "icao" },
   { key: "reg", label: "REG", placeholder: "registration" },
-  { key: "type", label: "TYPE", placeholder: "type" },
   { key: "airframe", label: "AIRFRAME", placeholder: "airframe" },
   { key: "serial", label: "SERIAL", placeholder: "serial" },
   { key: "operator_name", label: "OPERATOR", placeholder: "operator" },
@@ -46,7 +44,6 @@ const FILTERS: { key: FilterKey; label: string; placeholder: string }[] = [
 const EMPTY_FILTERS: Record<FilterKey, string> = {
   icao: "",
   reg: "",
-  type: "",
   airframe: "",
   serial: "",
   operator_name: "",
@@ -60,7 +57,6 @@ const EMPTY_FORM = {
   reg: "",
   serial: "",
   airframe: "",
-  type: "",
   operator_id: "",
   category_id: "",
   note: "",
@@ -68,10 +64,9 @@ const EMPTY_FORM = {
 
 type AircraftFormData = typeof EMPTY_FORM;
 
-const FORM_FIELDS: Array<{ key: keyof Pick<AircraftFormData, "icao" | "reg" | "serial" | "airframe" | "type">; label: string; required?: boolean; placeholder: string }> = [
+const FORM_FIELDS: Array<{ key: keyof Pick<AircraftFormData, "icao" | "reg" | "serial" | "airframe">; label: string; required?: boolean; placeholder: string }> = [
   { key: "icao", label: "ICAO", required: true, placeholder: "Required ICAO code" },
   { key: "reg", label: "Registration", placeholder: "Tail / registration" },
-  { key: "type", label: "Type", placeholder: "Aircraft type" },
   { key: "airframe", label: "Airframe", placeholder: "Airframe family" },
   { key: "serial", label: "Serial", placeholder: "Manufacturer serial" },
 ];
@@ -82,7 +77,6 @@ function rowToForm(row: AircraftView): AircraftFormData {
     reg: row.reg ?? "",
     serial: row.serial ?? "",
     airframe: row.airframe ?? "",
-    type: row.type ?? "",
     operator_id: row.operator_id == null ? "" : String(row.operator_id),
     category_id: row.category_id == null ? "" : String(row.category_id),
     note: row.note ?? "",
@@ -236,7 +230,6 @@ export default function FleetView() {
         reg: form.reg.trim(),
         serial: form.serial.trim(),
         airframe: form.airframe.trim(),
-        type: form.type.trim(),
         operator_id: form.operator_id ? Number(form.operator_id) : null,
         category_id: form.category_id ? Number(form.category_id) : null,
         note: form.note.trim(),
@@ -351,7 +344,7 @@ export default function FleetView() {
                   <TextInput
                     value={search}
                     onChange={e => setSearch(e.target.value)}
-                    placeholder="Search across ICAO, registration, type, operator..."
+                    placeholder="Search across ICAO, registration, category, operator..."
                   />
                 </div>
                 {FILTERS.map(filter => (
@@ -633,7 +626,6 @@ export default function FleetView() {
                   {[
                     ["ID", `#${selected.id}`],
                     ["REG", selected.reg || "-"],
-                    ["TYPE", selected.type || "-"],
                     ["AIRFRAME", selected.airframe || "-"],
                     ["SERIAL", selected.serial || "-"],
                     ["CATEGORY", selectedCategory?.name ?? selected.category_name ?? "-"],
