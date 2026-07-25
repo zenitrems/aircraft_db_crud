@@ -83,12 +83,16 @@ function rowToForm(row: AircraftView): AircraftFormData {
   };
 }
 
+function isTbdIcao(icao: string) {
+  return icao.trim().toUpperCase() === "TBD";
+}
+
 function adsbxIcaoUrl(icao: string) {
   return `https://globe.adsbexchange.com/?icao=${encodeURIComponent(icao.trim())}`;
 }
 
 function adsbxIcaoListUrl(icaos: string[]) {
-  const uniqueIcaos = Array.from(new Set(icaos.map(icao => icao.trim()).filter(Boolean)));
+  const uniqueIcaos = Array.from(new Set(icaos.map(icao => icao.trim()).filter(icao => Boolean(icao) && !isTbdIcao(icao))));
   return `https://globe.adsbexchange.com/?icao=${uniqueIcaos.map(encodeURIComponent).join(",")}`;
 }
 
@@ -443,7 +447,7 @@ export default function FleetView() {
                         >
                           {col.key === "id" ? (
                             `#${row.id}`
-                          ) : col.key === "icao" && row.icao ? (
+                          ) : col.key === "icao" && row.icao && !isTbdIcao(row.icao) ? (
                             <a
                               href={adsbxIcaoUrl(row.icao)}
                               target="_blank"
@@ -603,7 +607,7 @@ export default function FleetView() {
                   <div>
                     <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ops-dim">SELECTED RECORD</div>
                     <div className="mt-1 text-base font-semibold text-ops-text">
-                      {selected.icao ? (
+                      {selected.icao && !isTbdIcao(selected.icao) ? (
                         <a
                           href={adsbxIcaoUrl(selected.icao)}
                           target="_blank"
@@ -613,7 +617,7 @@ export default function FleetView() {
                           {selected.icao}
                         </a>
                       ) : (
-                        `#${selected.id}`
+                        selected.icao ?? `#${selected.id}`
                       )}
                     </div>
                   </div>
