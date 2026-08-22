@@ -38,15 +38,41 @@ src/
 │   └── stats/
 │       └── page.tsx
 ├── components/
+│   ├── DashboardTabs.tsx         # fleet / unknown segmented switch
 │   ├── FleetView.tsx             # aircraft_view display
 │   ├── UnidentifiedAircraftView.tsx # dashboard for unidentified contacts
 │   ├── CatalogManager.tsx        # CRUD for operators and categories
-│   ├── AppHeader.tsx            # top navigation for app pages
-│   └── AircraftManager.tsx      # CRUD for aircraft table
+│   ├── AppHeader.tsx             # top navigation for app pages
+│   ├── ThemeToggle.tsx           # dark (default) / light switch
+│   ├── ui.tsx                    # compact interface primitives
+│   ├── viz.tsx                   # chart primitives (stat, meter, bars, heatmap)
+│   └── AircraftManager.tsx       # CRUD for aircraft table
 └── lib/
     ├── db.ts                     # pg Pool singleton
+    ├── stats.ts                  # analytics queries for /stats
     └── types.ts                  # TypeScript interfaces
 ```
+
+## Interface
+
+Dark-first, compact operations theme. Design tokens live in `src/app/globals.css`
+(`:root` = dark, `:root[data-theme="light"]` = light) and are exposed to Tailwind
+as `ops-*` colors in `tailwind.config.js`. Charts use a single validated teal
+sequential ramp (`--seq-1` … `--seq-7`) with red reserved for data gaps.
+
+## Analytics (`/stats`)
+
+Coverage- and composition-oriented, computed in `src/lib/stats.ts`:
+
+- ADS-B trackability (share of records with a valid 6-digit hex ICAO)
+- Per-field completeness of the registry, with the missing count per field
+- Fleet by operator (with per-operator ADS-B coverage) and by category
+- Dominant airframes, distinct/singleton counts and top-5 concentration
+- Operator x category heatmap
+- Registration-prefix composition and ICAO allocation blocks
+- Monthly additions over the last 12 months, with a 30-day pace delta
+- Attention queue (records with critical fields empty) and identity collisions
+- Unidentified-contact backlog, including hexes that collide with the fleet
 
 ## API Endpoints
 

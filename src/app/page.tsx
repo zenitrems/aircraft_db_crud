@@ -1,37 +1,44 @@
+import Link from "next/link";
 import AppHeader from "@/components/AppHeader";
-import FleetView from "@/components/FleetView";
-import UnidentifiedAircraftView from "@/components/UnidentifiedAircraftView";
+import DashboardTabs from "@/components/DashboardTabs";
+import { Panel } from "@/components/ui";
+import { Stat, formatNumber, formatPct } from "@/components/viz";
+import { getDashboardSummary } from "@/lib/stats";
 
-export default function Home() {
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const summary = await getDashboardSummary();
+
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader current="dashboard" />
 
-      <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-[1720px] space-y-8">
-          <section className="border-b border-ops-border pb-6">
-            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-              <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-ops-dim">
-                  Operations dashboard
-                </div>
-                <h1 className="mt-2 text-3xl font-semibold leading-tight text-ops-text">
-                  Fleet records, unknown contacts, and core actions.
-                </h1>
-              </div>
-              <div className="grid grid-cols-3 gap-3 text-sm text-ops-secondary">
-                {["Fleet", "Unknown", "Catalogs"].map(item => (
-                  <div key={item} className="min-w-24 rounded-md border border-ops-border bg-ops-panel px-4 py-3">
-                    <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-ops-dim">Module</div>
-                    <div className="mt-1 font-medium text-ops-text">{item}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+      <main className="flex-1 px-3 py-3 sm:px-4">
+        <div className="mx-auto max-w-[1720px] space-y-2.5">
+          <Panel className="grid grid-cols-2 divide-x divide-y divide-ops-border sm:grid-cols-3 xl:grid-cols-5 xl:divide-y-0">
+            <Stat label="Aeronaves" value={formatNumber(summary.total)} hint={`${formatNumber(summary.operators)} operadores`} />
+            <Stat
+              label="Rastreables ADS-B"
+              value={formatPct(summary.trackable, summary.total)}
+              hint={`${formatNumber(summary.trackable)} con hex valido`}
+              tone="accent"
+            />
+            <Stat
+              label="ICAO pendiente"
+              value={formatNumber(summary.pending_icao)}
+              hint="TBD o hex no valido"
+              tone={summary.pending_icao > 0 ? "danger" : "default"}
+            />
+            <Stat label="Altas 30 dias" value={formatNumber(summary.added_30d)} hint="Registros nuevos" />
+            <Stat
+              label="Sin identificar"
+              value={formatNumber(summary.unknown_open)}
+              hint={<Link href="/stats" className="ops-link">Ver analitica</Link>}
+            />
+          </Panel>
 
-          <FleetView />
-          <UnidentifiedAircraftView />
+          <DashboardTabs unknownCount={summary.unknown_open} />
         </div>
       </main>
     </div>

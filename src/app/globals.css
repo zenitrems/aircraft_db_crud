@@ -1,70 +1,107 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @import "tailwindcss";
 @config "../../tailwind.config.js";
 
 @layer base {
-  :root {
-    --bg-void: #f6f5f1;
+  /* Dark is the primary mode. Light is a derived, equally deliberate variant. */
+  :root,
+  :root[data-theme="dark"] {
+    --bg-void: #0a0b0d;
+    --bg-panel: #101216;
+    --bg-surface: #171a20;
+    --bg-elevated: #0c0e11;
+    --bg-hover: #191d24;
+
+    --border-dim: rgba(233, 238, 245, 0.08);
+    --border-mid: rgba(233, 238, 245, 0.14);
+    --border-active: rgba(34, 168, 148, 0.55);
+
+    --accent-primary: #22a894;
+    --accent-strong: #3ec4b0;
+    --accent-muted: #2bb8a2;
+    --accent-soft: rgba(34, 168, 148, 0.18);
+    --accent-ghost: rgba(34, 168, 148, 0.09);
+
+    --red: #e5484d;
+    --red-ghost: rgba(229, 72, 77, 0.12);
+
+    --text-primary: #e7eaee;
+    --text-secondary: #9aa2ad;
+    --text-dim: #6a7280;
+    --text-faint: #4b5158;
+
+    --grid: rgba(233, 238, 245, 0.07);
+    --track: rgba(233, 238, 245, 0.07);
+
+    /* Sequential ramp — one hue, low → high magnitude. */
+    --seq-1: #14322f;
+    --seq-2: #17453f;
+    --seq-3: #185a51;
+    --seq-4: #1a7063;
+    --seq-5: #1d8878;
+    --seq-6: #22a894;
+    --seq-7: #3ec4b0;
+
+    --scrollbar-thumb: rgba(233, 238, 245, 0.16);
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    --display: 'Inter', system-ui, -apple-system, sans-serif;
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --bg-void: #f3f3f1;
     --bg-panel: #ffffff;
-    --bg-surface: #efeee8;
-    --bg-elevated: #faf9f5;
-    --border-dim: rgba(28, 28, 25, 0.11);
-    --border-active: rgba(37, 99, 235, 0.34);
-    --accent-primary: #2563eb;
-    --accent-strong: #1d4ed8;
-    --accent-muted: #1f4fd1;
-    --accent-soft: #dbe7ff;
-    --accent-ghost: rgba(37, 99, 235, 0.08);
-    --amber: #f59e0b;
-    --red: #dc2626;
-    --text-primary: #171717;
-    --text-secondary: #525252;
-    --text-dim: #8a8a83;
-    --scrollbar-thumb: rgba(28, 28, 25, 0.18);
-    --mono: 'JetBrains Mono', monospace;
-    --display: 'Inter', system-ui, sans-serif;
+    --bg-surface: #ececea;
+    --bg-elevated: #f8f8f6;
+    --bg-hover: #f1f1ef;
+
+    --border-dim: rgba(18, 20, 23, 0.10);
+    --border-mid: rgba(18, 20, 23, 0.18);
+    --border-active: rgba(13, 148, 136, 0.5);
+
+    --accent-primary: #0d9488;
+    --accent-strong: #0a7a70;
+    --accent-muted: #0a7a70;
+    --accent-soft: rgba(13, 148, 136, 0.16);
+    --accent-ghost: rgba(13, 148, 136, 0.07);
+
+    --red: #c0322f;
+    --red-ghost: rgba(192, 50, 47, 0.09);
+
+    --text-primary: #14161a;
+    --text-secondary: #4b5158;
+    --text-dim: #7c828a;
+    --text-faint: #9aa0a7;
+
+    --grid: rgba(18, 20, 23, 0.08);
+    --track: rgba(18, 20, 23, 0.07);
+
+    --seq-1: #d9f0ec;
+    --seq-2: #b7e3dc;
+    --seq-3: #8ed2c8;
+    --seq-4: #55b8ab;
+    --seq-5: #0d9488;
+    --seq-6: #0a7a70;
+    --seq-7: #075f57;
+
+    --scrollbar-thumb: rgba(18, 20, 23, 0.18);
     color-scheme: light;
   }
 
-  :root[data-theme="dark"] {
-    --bg-void: #0c1118;
-    --bg-panel: #121923;
-    --bg-surface: #192231;
-    --bg-elevated: #101722;
-    --border-dim: rgba(224, 231, 255, 0.12);
-    --border-active: rgba(96, 165, 250, 0.45);
-    --accent-primary: #60a5fa;
-    --accent-strong: #93c5fd;
-    --accent-muted: #93c5fd;
-    --accent-soft: #1e3a5f;
-    --accent-ghost: rgba(96, 165, 250, 0.12);
-    --amber: #fbbf24;
-    --red: #f87171;
-    --text-primary: #edf3fb;
-    --text-secondary: #b8c3d4;
-    --text-dim: #7f8da3;
-    --scrollbar-thumb: rgba(224, 231, 255, 0.22);
-    color-scheme: dark;
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
     min-height: 100vh;
-    position: relative;
     background: var(--bg-void);
     color: var(--text-primary);
     font-family: var(--display);
-    font-size: 13px;
-    line-height: 1.6;
-  }
-
-  body::before {
-    content: none;
-  }
-
-  body > * {
-    position: relative;
-    z-index: 1;
+    font-size: 12.5px;
+    line-height: 1.45;
+    font-feature-settings: "cv05" 1;
+    -webkit-font-smoothing: antialiased;
   }
 
   a {
@@ -74,25 +111,52 @@
 
   button {
     cursor: pointer;
-    font-family: var(--display);
+    font-family: inherit;
   }
 
   select option {
     background: var(--bg-panel);
     color: var(--text-primary);
   }
+
+  ::selection {
+    background: var(--accent-soft);
+  }
+
+  :focus-visible {
+    outline: 1px solid var(--accent-primary);
+    outline-offset: 1px;
+  }
 }
 
 @layer components {
+  /* Compact field: 26px tall, hairline, no shadow. */
   .ops-field {
-    @apply w-full rounded-md border border-ops-border bg-ops-elevated px-3 py-2 font-display text-[13px] text-ops-text outline-none transition placeholder:text-ops-dim focus:border-ops-active focus:bg-ops-panel focus:shadow-focus;
+    @apply w-full rounded border border-ops-border bg-ops-elevated px-2 py-1 text-[12px] text-ops-text outline-none transition-colors placeholder:text-ops-faint focus:border-ops-active focus:bg-ops-panel;
+  }
+
+  .ops-field:focus-visible {
+    outline: none;
+  }
+
+  /* Micro label — the only uppercase text in the interface. */
+  .ops-eyebrow {
+    @apply font-mono text-[9.5px] uppercase tracking-[0.14em] text-ops-dim;
+  }
+
+  .ops-link {
+    @apply text-ops-accent underline decoration-ops-border underline-offset-[3px] transition-colors hover:decoration-ops-accent;
   }
 }
 
 @layer utilities {
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
   .scrollbar-thin::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
+    width: 6px;
+    height: 6px;
   }
 
   .scrollbar-thin::-webkit-scrollbar-track {
@@ -101,6 +165,10 @@
 
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: var(--scrollbar-thumb);
-    border-radius: 2px;
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }
