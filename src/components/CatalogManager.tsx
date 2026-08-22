@@ -1,16 +1,18 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { Check, Pencil, Trash2, X } from "lucide-react";
 import {
   Button,
   EmptyTableState,
-  FieldLabel,
   Panel,
-  SectionHeader,
+  PanelHead,
   TableHeaderCell,
   TextInput,
+  Toast,
   cn,
 } from "@/components/ui";
+import { formatPct } from "@/components/viz";
 
 type CatalogKind = "operators" | "categories";
 
@@ -22,26 +24,30 @@ type CatalogItem = {
 
 type CatalogConfig = {
   kind: CatalogKind;
-  eyebrow: string;
   title: string;
   singular: string;
   plural: string;
+  /** Spanish articles differ by gender, so each catalog carries its own. */
+  newLabel: string;
+  renameLabel: string;
 };
 
 const CATALOGS: CatalogConfig[] = [
   {
     kind: "operators",
-    eyebrow: "OPERATOR CATALOG",
     title: "Operadores",
     singular: "operador",
     plural: "operadores",
+    newLabel: "Nuevo operador",
+    renameLabel: "Renombrar operador",
   },
   {
     kind: "categories",
-    eyebrow: "CATEGORY CATALOG",
     title: "Categorias",
     singular: "categoria",
     plural: "categorias",
+    newLabel: "Nueva categoria",
+    renameLabel: "Renombrar categoria",
   },
 ];
 
@@ -52,11 +58,11 @@ function CatalogPanel({ config }: { config: CatalogConfig }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
-  const [message, setMessage] = useState<{ text: string; type: "ok" | "err" } | null>(null);
+  const [toast, setToast] = useState<{ text: string; type: "ok" | "err" } | null>(null);
 
-  const showMessage = useCallback((text: string, type: "ok" | "err" = "ok") => {
-    setMessage({ text, type });
-    setTimeout(() => setMessage(null), 3500);
+  const showToast = useCallback((text: string, type: "ok" | "err" = "ok") => {
+    setToast({ text, type });
+    setTimeout(() => setToast(null), 3000);
   }, []);
 
   const fetchItems = useCallback(async () => {
@@ -64,18 +70,22 @@ function CatalogPanel({ config }: { config: CatalogConfig }) {
     try {
       const res = await fetch(`/api/${config.kind}`);
       if (!res.ok) throw new Error();
-      const json = await res.json();
-      setItems(json);
+      setItems(await res.json());
     } catch {
-      showMessage(`No se pudieron cargar ${config.plural}`, "err");
+      showToast(`No se pudieron cargar ${config.plural}`, "err");
     } finally {
       setLoading(false);
     }
-  }, [config.kind, config.plural, showMessage]);
+  }, [config.kind, config.plural, showToast]);
 
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
+  useEffect(() => { fetchItems(); }, [fetchItems]);
+
+  const assigned = useMemo(
+    () => items.reduce((sum, item) => sum + (item.aircraft_count ?? 0), 0),
+    [items],
+  );
+  const peak = Math.max(1, ...items.map(item => item.aircraft_count ?? 0));
+  const unused = items.filter(item => (item.aircraft_count ?? 0) === 0).length;
 
   const resetForm = () => {
     setEditing(null);
@@ -92,7 +102,7 @@ function CatalogPanel({ config }: { config: CatalogConfig }) {
     const trimmedName = name.trim();
 
     if (!trimmedName) {
-      showMessage("El nombre es requerido", "err");
+      showToast("El nombre es requerido", "err");
       return;
     }
 
@@ -109,11 +119,11 @@ function CatalogPanel({ config }: { config: CatalogConfig }) {
         throw new Error(json?.error ?? "Save failed");
       }
 
-      showMessage(editing ? `${config.singular} actualizado` : `${config.singular} creado`);
+      showToast(editing ? `${config.singular} actualizado` : `${config.singular} creado`);
       resetForm();
       fetchItems();
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : "No se pudo guardar", "err");
+      showToast(error instanceof Error ? error.message : "No se pudo guardar", "err");
     } finally {
       setSaving(false);
     }
@@ -128,103 +138,112 @@ function CatalogPanel({ config }: { config: CatalogConfig }) {
         throw new Error(json?.error ?? "Delete failed");
       }
 
-      showMessage(`${config.singular} eliminado`);
+      showToast(`${config.singular} eliminado`);
       setConfirmDelete(null);
       if (editing?.id === item.id) resetForm();
       fetchItems();
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : "No se pudo borrar", "err");
+      showToast(error instanceof Error ? error.message : "No se pudo borrar", "err");
     }
   };
 
   return (
-    <Panel className={cn("p-5", editing && "border-ops-active")}>
-      <SectionHeader
-        eyebrow={config.eyebrow}
+    <Panel className={cn(editing && "border-ops-active")}>
+      {toast && <Toast message={toast.text} type={toast.type} />}
+
+      <PanelHead
         title={config.title}
-        meta={<span className="font-mono text-[11px] text-ops-dim">{items.length} TOTAL</span>}
+        hint={`${items.length} registros · ${assigned} aeronaves asignadas${unused ? ` · ${unused} sin uso` : ""}`}
       />
 
-      {message && (
-        <div
-          className={cn(
-            "mb-4 rounded-md border px-3 py-2 font-mono text-[11px] uppercase tracking-[0.08em]",
-            message.type === "ok"
-              ? "border-ops-active bg-ops-accentGhost text-ops-accentMuted"
-              : "border-ops-danger bg-red-400/15 text-ops-danger",
-          )}
-        >
-          {message.text}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="mb-5">
-        <FieldLabel>{editing ? `Editar ${config.singular}` : `Nuevo ${config.singular}`}</FieldLabel>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <TextInput
-            value={name}
-            onChange={event => setName(event.target.value)}
-            placeholder={`Nombre de ${config.singular}`}
-          />
-          <div className="flex shrink-0 gap-2">
-            <Button type="submit" disabled={saving}>
-              {saving ? "GUARDANDO..." : editing ? "ACTUALIZAR" : "CREAR"}
-            </Button>
-            {editing && (
-              <Button type="button" variant="secondary" onClick={resetForm}>
-                CANCELAR
-              </Button>
-            )}
-          </div>
-        </div>
+      <form onSubmit={handleSubmit} className="flex items-center gap-1.5 border-b border-ops-border px-2 py-2">
+        <TextInput
+          value={name}
+          onChange={event => setName(event.target.value)}
+          placeholder={editing ? config.renameLabel : config.newLabel}
+          className="h-[26px] flex-1"
+        />
+        <Button type="submit" size="sm" disabled={saving}>
+          {saving ? "…" : editing ? "Actualizar" : "Crear"}
+        </Button>
+        {editing && (
+          <Button type="button" size="sm" variant="ghost" onClick={resetForm}>
+            <X size={11} />
+          </Button>
+        )}
       </form>
 
       <div className="overflow-x-auto scrollbar-thin">
-        <table className="w-full min-w-[440px] border-collapse">
+        <table className="w-full border-collapse">
+          <colgroup>
+            <col style={{ width: 48 }} />
+            <col />
+            <col style={{ width: 150 }} />
+            <col style={{ width: 72 }} />
+          </colgroup>
           <thead>
-            <tr className="bg-ops-surface">
-              {["ID", "NOMBRE", "AIRCRAFT", "ACCIONES"].map(header => (
+            <tr>
+              {["ID", "NOMBRE", "USO", "ACC"].map(header => (
                 <TableHeaderCell key={header}>{header}</TableHeaderCell>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <EmptyTableState colSpan={4}>CARGANDO...</EmptyTableState>
+              <EmptyTableState colSpan={4}>CARGANDO…</EmptyTableState>
             ) : items.length === 0 ? (
-              <EmptyTableState colSpan={4}>NO HAY {config.plural.toUpperCase()}</EmptyTableState>
+              <EmptyTableState colSpan={4}>SIN {config.plural.toUpperCase()}</EmptyTableState>
             ) : (
-              items.map(item => (
-                <tr
-                  key={item.id}
-                  className={cn("border-b border-ops-border last:border-b-0", editing?.id === item.id && "bg-ops-accentGhost")}
-                >
-                  <td className="px-3 py-2 font-mono text-[11px] text-ops-dim">#{item.id}</td>
-                  <td className="px-3 py-2 font-bold text-ops-text">{item.name}</td>
-                  <td className="px-3 py-2 font-mono text-ops-accentMuted">{item.aircraft_count ?? 0}</td>
-                  <td className="px-3 py-2">
-                    {confirmDelete === item.id ? (
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="danger" onClick={() => handleDelete(item)}>
-                          CONFIRMAR
-                        </Button>
-                        <Button size="sm" variant="secondary" onClick={() => setConfirmDelete(null)}>
-                          CANCELAR
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="secondary" onClick={() => handleEdit(item)}>
-                          EDITAR
-                        </Button>
-                        <Button size="sm" variant="danger" onClick={() => setConfirmDelete(item.id)}>
-                          BORRAR
-                        </Button>
-                      </div>
+              items.map(item => {
+                const count = item.aircraft_count ?? 0;
+                return (
+                  <tr
+                    key={item.id}
+                    className={cn(
+                      "border-b border-ops-border last:border-b-0 hover:bg-ops-hover",
+                      editing?.id === item.id && "bg-ops-accentGhost",
                     )}
-                  </td>
-                </tr>
-              ))
+                  >
+                    <td className="tnum px-2 py-1 font-mono text-[10.5px] text-ops-faint">#{item.id}</td>
+                    <td className="px-2 py-1 text-[11.5px] font-medium text-ops-text">{item.name}</td>
+                    <td className="px-2 py-1">
+                      <div className="flex items-center gap-1.5" title={`${count} aeronaves`}>
+                        <span className="h-1.5 flex-1 rounded-full bg-ops-track">
+                          <span
+                            className="block h-full rounded-full bg-ops-accent"
+                            style={{ width: `${count === 0 ? 0 : Math.max(4, (count / peak) * 100)}%` }}
+                          />
+                        </span>
+                        <span className="tnum w-6 text-right font-mono text-[10.5px] text-ops-secondary">{count}</span>
+                        <span className="tnum w-8 text-right font-mono text-[9.5px] text-ops-faint">
+                          {formatPct(count, assigned)}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-2 py-1">
+                      {confirmDelete === item.id ? (
+                        <div className="flex gap-1">
+                          <Button size="xs" variant="danger" onClick={() => handleDelete(item)} aria-label="Confirmar borrado">
+                            <Check size={11} />
+                          </Button>
+                          <Button size="xs" variant="secondary" onClick={() => setConfirmDelete(null)} aria-label="Cancelar">
+                            <X size={11} />
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-1">
+                          <Button size="xs" variant="secondary" onClick={() => handleEdit(item)} aria-label="Editar">
+                            <Pencil size={11} />
+                          </Button>
+                          <Button size="xs" variant="danger" onClick={() => setConfirmDelete(item.id)} aria-label="Borrar">
+                            <Trash2 size={11} />
+                          </Button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
@@ -235,17 +254,10 @@ function CatalogPanel({ config }: { config: CatalogConfig }) {
 
 export default function CatalogManager() {
   return (
-    <div>
-      <SectionHeader
-        eyebrow="DATABASE CATALOGS"
-        title="CRUD de operadores y categorias"
-      />
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        {CATALOGS.map(config => (
-          <CatalogPanel key={config.kind} config={config} />
-        ))}
-      </div>
+    <div className="grid gap-2.5 xl:grid-cols-2">
+      {CATALOGS.map(config => (
+        <CatalogPanel key={config.kind} config={config} />
+      ))}
     </div>
   );
 }

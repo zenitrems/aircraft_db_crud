@@ -4,19 +4,18 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "AIRCRAFT.DB",
+  description: "Registro de aeronaves, contactos no identificados y analitica de cobertura.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="es" data-theme="dark" suppressHydrationWarning>
       <body>
         <Script id="theme-init" strategy="beforeInteractive">
           {`
             try {
               var storedTheme = window.localStorage.getItem("aircraft-theme");
-              var theme = storedTheme === "dark" || storedTheme === "light"
-                ? storedTheme
-                : (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+              var theme = storedTheme === "light" ? "light" : "dark";
               document.documentElement.dataset.theme = theme;
               document.documentElement.style.colorScheme = theme;
             } catch (_) {}

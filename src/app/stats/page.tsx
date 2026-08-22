@@ -1,154 +1,379 @@
 import AppHeader from "@/components/AppHeader";
-import { Panel, SectionHeader } from "@/components/ui";
-import { pool } from "@/lib/db";
+import { Badge, Panel, PanelHead } from "@/components/ui";
+import {
+  ColumnChart,
+  Heatmap,
+  Hero,
+  Meter,
+  RampLegend,
+  RankedBars,
+  Stat,
+  formatNumber,
+  formatPct,
+} from "@/components/viz";
+import { getFleetStats } from "@/lib/stats";
 
 export const dynamic = "force-dynamic";
 
-type OperatorStat = {
-  operator_name: string;
-  aircraft_count: number;
-};
+const MONTH_LABELS = ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN", "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"];
 
-type AirframeStat = {
-  airframe: string;
-  aircraft_count: number;
-};
+/** Fill the gaps so a quiet month reads as zero, not as a missing bar. */
+function buildMonthSeries(rows: Array<{ month: string; total: number }>) {
+  const byMonth = new Map(rows.map(row => [row.month, row.total]));
+  const points: Array<{ label: string; value: number; caption: string }> = [];
+  const cursor = new Date();
+  cursor.setDate(1);
 
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("es-MX").format(value);
+  for (let offset = 11; offset >= 0; offset -= 1) {
+    const date = new Date(cursor.getFullYear(), cursor.getMonth() - offset, 1);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    points.push({
+      label: MONTH_LABELS[date.getMonth()],
+      value: byMonth.get(key) ?? 0,
+      caption: `${MONTH_LABELS[date.getMonth()]} ${date.getFullYear()}`,
+    });
+  }
+
+  return points;
+}
+
+function formatDate(value: string | null) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 export default async function StatsPage() {
-  const [operatorResult, airframeResult, totalResult] = await Promise.all([
-    pool.query<OperatorStat>(
-      `SELECT COALESCE(o.name, 'Sin operador') AS operator_name, COUNT(*)::int AS aircraft_count
-       FROM core.aircraft a
-       LEFT JOIN core.operators o ON o.id = a.operator_id
-       GROUP BY COALESCE(o.name, 'Sin operador')
-       ORDER BY aircraft_count DESC, operator_name ASC`
-    ),
-    pool.query<AirframeStat>(
-      `SELECT COALESCE(NULLIF(TRIM(airframe), ''), 'Sin airframe') AS airframe, COUNT(*)::int AS aircraft_count
-       FROM core.aircraft
-       GROUP BY COALESCE(NULLIF(TRIM(airframe), ''), 'Sin airframe')
-       ORDER BY aircraft_count DESC, airframe ASC
-       LIMIT 1`
-    ),
-    pool.query<{ total: string }>("SELECT COUNT(*)::text AS total FROM core.aircraft"),
-  ]);
+  const stats = await getFleetStats();
+  const { kpis, coverage, operators, categories, airframes, airframeShape, matrix, unknown } = stats;
 
-  const operatorStats = operatorResult.rows;
-  const topAirframe = airframeResult.rows[0] ?? null;
-  const totalAircraft = parseInt(totalResult.rows[0]?.total ?? "0", 10);
+  const months = buildMonthSeries(stats.months);
+  const delta = kpis.added_30d - kpis.added_prev_30d;
+  const matrixValue = new Map(matrix.cells.map(cell => [`${cell.operator}|${cell.category}`, cell.total]));
+  const matrixPeak = Math.max(1, ...matrix.cells.map(cell => cell.total));
+  const concentration = airframeShape.classified
+    ? (airframeShape.top5 / airframeShape.classified) * 100
+    : 0;
+  const weakestField = [...coverage].sort((a, b) => a.filled / (a.total || 1) - b.filled / (b.total || 1))[0];
 
   return (
     <div className="flex min-h-screen flex-col">
       <AppHeader current="stats" />
 
-      <main className="flex-1 p-6">
-        <SectionHeader
-          eyebrow="FLEET STATISTICS"
-          title="Aircraft Stats"
-          meta={(
-            <div className="flex items-center gap-3">
-              <span className="font-mono text-2xl font-bold text-ops-accentMuted">{formatNumber(totalAircraft)}</span>
-              <span className="text-[11px] text-ops-dim">AIRCRAFT TOTAL</span>
-            </div>
-          )}
-        />
-
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1.5fr)_minmax(320px,0.8fr)]">
-          <Panel className="p-5">
-            <div className="mb-4 flex items-end justify-between gap-3 border-b border-ops-border pb-3">
-              <div>
-                <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ops-dim">
-                  Aircraft By Operator
+      <main className="flex-1 px-3 py-3 sm:px-4">
+        <div className="mx-auto max-w-[1600px] space-y-2.5">
+          {/* ------------------------------------------------ headline row */}
+          <div className="grid gap-2.5 lg:grid-cols-[minmax(240px,1fr)_minmax(0,3fr)]">
+            <Panel className="flex flex-col justify-between">
+              <Hero
+                value={formatNumber(kpis.total)}
+                label="Aeronaves en registro"
+                hint={`${formatNumber(kpis.operators)} operadores · ${formatNumber(kpis.categories)} categorias · ${formatNumber(kpis.airframes)} airframes`}
+              />
+              <div className="border-t border-ops-border px-3 py-2">
+                <div className="mb-1 flex items-baseline justify-between">
+                  <span className="ops-eyebrow">Cobertura ADS-B</span>
+                  <span className="tnum font-mono text-[11px] text-ops-accent">
+                    {formatPct(kpis.trackable, kpis.total, 1)}
+                  </span>
                 </div>
-                <div className="mt-1 text-lg font-bold text-ops-text">
-                  Distribucion actual por operador
+                <Meter value={kpis.trackable} total={kpis.total} />
+                <div className="mt-1.5 text-[10.5px] text-ops-dim">
+                  {formatNumber(kpis.trackable)} con hex valido ·{" "}
+                  <span className="text-ops-danger">{formatNumber(kpis.pending_icao)} sin ICAO</span>
                 </div>
               </div>
-              <div className="text-[11px] text-ops-dim">
-                {formatNumber(operatorStats.length)} operadores
-              </div>
-            </div>
+            </Panel>
 
-            <div className="overflow-hidden rounded-md border border-ops-border">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-ops-surface">
-                    <th className="border-b border-ops-border px-4 py-3 text-left font-mono text-[10px] tracking-[0.15em] text-ops-dim">
-                      OPERATOR
-                    </th>
-                    <th className="border-b border-ops-border px-4 py-3 text-right font-mono text-[10px] tracking-[0.15em] text-ops-dim">
-                      AIRCRAFT
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {operatorStats.length === 0 ? (
-                    <tr>
-                      <td colSpan={2} className="px-4 py-10 text-center text-ops-dim">
-                        NO HAY DATOS DISPONIBLES
-                      </td>
-                    </tr>
-                  ) : (
-                    operatorStats.map((row, index) => (
-                      <tr key={`${row.operator_name}-${index}`} className="border-b border-ops-border last:border-b-0">
-                        <td className="px-4 py-3 text-ops-text">{row.operator_name}</td>
-                        <td className="px-4 py-3 text-right font-mono text-ops-accentMuted">
-                          {formatNumber(row.aircraft_count)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+            <Panel className="grid grid-cols-2 divide-x divide-y divide-ops-border sm:grid-cols-3 xl:grid-cols-5 xl:divide-y-0">
+              <Stat
+                label="Registros incompletos"
+                value={formatNumber(kpis.incomplete)}
+                hint={`${formatPct(kpis.incomplete, kpis.total)} con algun campo critico vacio`}
+              />
+              <Stat
+                label="ICAO pendiente"
+                value={formatNumber(kpis.pending_icao)}
+                hint="TBD o hex no valido"
+                tone={kpis.pending_icao > 0 ? "danger" : "default"}
+              />
+              <Stat
+                label="Altas 30 dias"
+                value={formatNumber(kpis.added_30d)}
+                hint={`${delta >= 0 ? "+" : ""}${formatNumber(delta)} vs 30 dias previos`}
+              />
+              <Stat
+                label="Concentracion top-5"
+                value={`${concentration.toFixed(0)}%`}
+                hint={`${formatNumber(airframeShape.distinct)} airframes distintos`}
+              />
+              <Stat
+                label="Contactos sin identificar"
+                value={formatNumber(unknown.total)}
+                hint={`${formatNumber(unknown.with_hex)} con hex resoluble`}
+              />
+            </Panel>
+          </div>
+
+          {/* ----------------------------------------- coverage + altas row */}
+          <div className="grid gap-2.5 lg:grid-cols-3">
+            <Panel>
+              <PanelHead
+                title="Completitud del registro"
+                hint="Campos poblados por aeronave"
+                right={
+                  weakestField && (
+                    <Badge tone="danger">
+                      {weakestField.label} {formatPct(weakestField.filled, weakestField.total)}
+                    </Badge>
+                  )
+                }
+              />
+              <ul className="divide-y divide-ops-border">
+                {coverage.map(field => {
+                  const missing = field.total - field.filled;
+                  return (
+                    <li key={field.field} className="px-3 py-[7px]" title={`${field.label}: faltan ${formatNumber(missing)}`}>
+                      <div className="mb-1 flex items-baseline justify-between gap-2">
+                        <span className="truncate text-[11.5px] text-ops-secondary">{field.label}</span>
+                        <span className="flex items-baseline gap-2">
+                          <span className="tnum font-mono text-[11px] text-ops-text">
+                            {formatPct(field.filled, field.total)}
+                          </span>
+                          <span className="tnum w-10 text-right font-mono text-[10px] text-ops-dim">
+                            {missing > 0 ? `−${formatNumber(missing)}` : "—"}
+                          </span>
+                        </span>
+                      </div>
+                      <Meter value={field.filled} total={field.total} />
+                    </li>
+                  );
+                })}
+              </ul>
+            </Panel>
+
+            <Panel className="flex flex-col">
+              <PanelHead
+                title="Altas por mes"
+                hint="Ultimos 12 meses"
+                right={<span className="tnum font-mono text-[11px] text-ops-text">{formatNumber(kpis.total)}</span>}
+              />
+              <ColumnChart points={months} />
+              <div className="mt-auto grid grid-cols-2 divide-x divide-ops-border border-t border-ops-border">
+                <Stat label="Ultimos 30 dias" value={formatNumber(kpis.added_30d)} />
+                <Stat
+                  label="30 dias previos"
+                  value={formatNumber(kpis.added_prev_30d)}
+                  hint={delta >= 0 ? `Ritmo +${formatNumber(delta)}` : `Ritmo ${formatNumber(delta)}`}
+                />
+              </div>
+            </Panel>
+
+            <Panel className="flex flex-col">
+              <PanelHead title="Composicion de matriculas" hint="Prefijo de registro" />
+              <RankedBars
+                items={stats.registries.map(row => ({
+                  name: row.name,
+                  total: row.total,
+                  note: formatPct(row.total, kpis.total),
+                }))}
+                labelWidth="8.5rem"
+              />
+              <div className="mt-auto border-t border-ops-border">
+                <PanelHead title="Bloque ICAO asignado" hint="Solo aeronaves con hex valido" />
+                <RankedBars
+                  items={stats.blocks.slice(0, 5).map(row => ({
+                    name: row.name,
+                    total: row.total,
+                    note: formatPct(row.total, kpis.trackable),
+                  }))}
+                  labelWidth="8.5rem"
+                  emptyLabel="Sin hex validos"
+                />
+              </div>
+            </Panel>
+          </div>
+
+          {/* --------------------------------------------- composition row */}
+          <div className="grid gap-2.5 lg:grid-cols-3">
+            <Panel>
+              <PanelHead
+                title="Flota por operador"
+                hint="Total y cobertura ADS-B"
+                right={<span className="ops-eyebrow">ADS-B</span>}
+              />
+              <RankedBars
+                items={operators.map(row => ({
+                  name: row.name,
+                  total: row.total,
+                  note: formatPct(row.trackable, row.total),
+                }))}
+                labelWidth="7rem"
+              />
+            </Panel>
+
+            <Panel>
+              <PanelHead
+                title="Flota por categoria"
+                hint="Distribucion operativa"
+                right={<span className="ops-eyebrow">% flota</span>}
+              />
+              <RankedBars
+                items={categories.map(row => ({
+                  name: row.name,
+                  total: row.total,
+                  note: formatPct(row.total, kpis.total),
+                }))}
+                labelWidth="7rem"
+              />
+            </Panel>
+
+            <Panel>
+              <PanelHead
+                title="Airframes dominantes"
+                hint={`${formatNumber(airframeShape.singletons)} airframes con una sola aeronave`}
+                right={<span className="ops-eyebrow">operadores</span>}
+              />
+              <RankedBars
+                items={airframes.map(row => ({
+                  name: row.name,
+                  total: row.total,
+                  note: `${row.operators} op`,
+                }))}
+                labelWidth="9.5rem"
+              />
+            </Panel>
+          </div>
+
+          {/* -------------------------------------------------- matrix row */}
+          <Panel>
+            <PanelHead
+              title="Operador × categoria"
+              hint="Aeronaves por cruce; el color escala con el conteo"
+              right={<RampLegend peak={matrixPeak} />}
+            />
+            <Heatmap
+              rows={matrix.operators}
+              cols={matrix.categories}
+              valueAt={(row, col) => matrixValue.get(`${row}|${col}`) ?? 0}
+            />
           </Panel>
 
-          <div className="space-y-4">
-            <Panel className="p-5">
-              <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ops-dim">
-                Most Used Airframe
-              </div>
-              <div className="mt-2 text-3xl font-bold text-ops-accentMuted">
-                {topAirframe?.airframe ?? "Sin datos"}
-              </div>
-              <div className="mt-4 flex items-end justify-between gap-4">
-                <div className="text-ops-secondary">
-                  Airframe con mayor presencia dentro de `core.aircraft`.
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-2xl font-bold text-ops-text">
-                    {formatNumber(topAirframe?.aircraft_count ?? 0)}
-                  </div>
-                  <div className="text-[11px] uppercase tracking-[0.12em] text-ops-dim">records</div>
-                </div>
+          {/* ------------------------------------------------ backlog row */}
+          <div className="grid gap-2.5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+            <Panel>
+              <PanelHead
+                title="Requiere atencion"
+                hint={`${formatNumber(kpis.incomplete)} registros con campos criticos vacios`}
+                right={<Badge tone="danger">Top {formatNumber(stats.attention.length)}</Badge>}
+              />
+              <div className="overflow-x-auto scrollbar-thin">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      {["ID", "ICAO", "MATRICULA", "AIRFRAME", "OPERADOR", "FALTA"].map(header => (
+                        <th
+                          key={header}
+                          className="border-b border-ops-border px-2 py-1.5 text-left font-mono text-[9.5px] uppercase tracking-[0.12em] text-ops-dim"
+                        >
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stats.attention.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-2 py-8 text-center font-mono text-[11px] text-ops-faint">
+                          SIN PENDIENTES
+                        </td>
+                      </tr>
+                    ) : (
+                      stats.attention.map(row => (
+                        <tr key={row.id} className="border-b border-ops-border last:border-b-0 hover:bg-ops-hover">
+                          <td className="tnum px-2 py-1.5 font-mono text-[10.5px] text-ops-faint">#{row.id}</td>
+                          <td className="px-2 py-1.5 font-mono text-[11px] text-ops-text">{row.icao || "—"}</td>
+                          <td className="px-2 py-1.5 font-mono text-[11px] text-ops-secondary">{row.reg || "—"}</td>
+                          <td className="max-w-[180px] truncate px-2 py-1.5 text-[11.5px] text-ops-secondary">
+                            {row.airframe || <span className="text-ops-danger">sin airframe</span>}
+                          </td>
+                          <td className="px-2 py-1.5 text-[11.5px] text-ops-secondary">{row.operator ?? "—"}</td>
+                          <td className="px-2 py-1.5">
+                            <span className="flex flex-wrap gap-1">
+                              {row.reasons.map(reason => (
+                                <Badge key={reason} tone="danger">
+                                  {reason}
+                                </Badge>
+                              ))}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </Panel>
 
-            <Panel className="p-5">
-              <div className="font-mono text-[11px] uppercase tracking-[0.18em] text-ops-dim">
-                Coverage
-              </div>
-              <div className="mt-2 text-lg font-bold text-ops-text">
-                Resumen rapido del inventario
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-md bg-ops-surface px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.15em] text-ops-dim">Aircraft</div>
-                  <div className="mt-1 font-mono text-2xl text-ops-accentMuted">{formatNumber(totalAircraft)}</div>
+            <div className="space-y-2.5">
+              <Panel>
+                <PanelHead title="Contactos sin identificar" hint="Bandeja de resolucion" />
+                <div className="grid grid-cols-2 divide-x divide-y divide-ops-border">
+                  <Stat label="Abiertos" value={formatNumber(unknown.total)} />
+                  <Stat
+                    label="Con hex valido"
+                    value={formatNumber(unknown.with_hex)}
+                    hint="Candidatos a alta"
+                    tone="accent"
+                  />
+                  <Stat label="Primer avistamiento" value={<span className="text-[13px]">{formatDate(unknown.oldest)}</span>} />
+                  <Stat label="Ultimo avistamiento" value={<span className="text-[13px]">{formatDate(unknown.newest)}</span>} />
                 </div>
-                <div className="rounded-md bg-ops-surface px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.15em] text-ops-dim">Operators</div>
-                  <div className="mt-1 font-mono text-2xl text-ops-accentMuted">{formatNumber(operatorStats.length)}</div>
+                {unknown.colliding > 0 && (
+                  <div className="border-t border-ops-border px-3 py-2 text-[11px] text-ops-danger">
+                    {formatNumber(unknown.colliding)} contacto(s) comparten hex con la flota registrada.
+                  </div>
+                )}
+              </Panel>
+
+              <Panel>
+                <PanelHead
+                  title="Colisiones de identidad"
+                  hint="Valores repetidos que deberian ser unicos"
+                />
+                <div className="grid grid-cols-2 divide-x divide-ops-border">
+                  <div>
+                    <div className="ops-eyebrow px-3 pt-2">Matricula</div>
+                    <DuplicateList items={stats.duplicates.reg} />
+                  </div>
+                  <div>
+                    <div className="ops-eyebrow px-3 pt-2">Serial</div>
+                    <DuplicateList items={stats.duplicates.serial} />
+                  </div>
                 </div>
-              </div>
-            </Panel>
+              </Panel>
+            </div>
           </div>
         </div>
       </main>
     </div>
+  );
+}
+
+function DuplicateList({ items }: { items: Array<{ name: string; total: number }> }) {
+  if (items.length === 0) {
+    return <div className="px-3 py-4 font-mono text-[10.5px] text-ops-faint">Sin repetidos</div>;
+  }
+
+  return (
+    <ul className="px-3 py-1.5">
+      {items.map(item => (
+        <li key={item.name} className="flex items-baseline justify-between gap-2 py-[3px]">
+          <span className="truncate font-mono text-[11px] text-ops-secondary">{item.name}</span>
+          <span className="tnum font-mono text-[11px] text-ops-danger">×{item.total}</span>
+        </li>
+      ))}
+    </ul>
   );
 }

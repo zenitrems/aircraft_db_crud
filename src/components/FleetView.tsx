@@ -1,16 +1,19 @@
 "use client";
+
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import type { AircraftView, Category, Operator } from "@/lib/types";
 import {
+  Badge,
   Button,
   EmptyTableState,
   FieldLabel,
   Panel,
-  SectionHeader,
   SelectInput,
   TableHeaderCell,
-  TextareaInput,
   TextInput,
+  TextareaInput,
+  Toast,
   cn,
 } from "@/components/ui";
 
@@ -18,27 +21,27 @@ type SortKey = "id" | keyof AircraftView;
 type SortDir = "asc" | "desc";
 type FilterKey = "icao" | "reg" | "airframe" | "serial" | "operator_name" | "category_name" | "note" | "created_at";
 
-const COLS: { key: SortKey; label: string; width?: number; align?: "left" | "right" }[] = [
-  { key: "id", label: "ID", width: 74 },
-  { key: "icao", label: "ICAO", width: 100 },
-  { key: "reg", label: "REG", width: 110 },
-  { key: "airframe", label: "AIRFRAME", width: 150 },
-  { key: "serial", label: "SERIAL", width: 130 },
-  { key: "operator_name", label: "OPERATOR", width: 180 },
-  { key: "category_name", label: "CATEGORY", width: 140 },
-  { key: "note", label: "NOTE", width: 260 },
-  { key: "created_at", label: "ADDED", width: 140 },
+const COLS: { key: SortKey; label: string; width?: number }[] = [
+  { key: "id", label: "ID", width: 56 },
+  { key: "icao", label: "ICAO", width: 82 },
+  { key: "reg", label: "REG", width: 92 },
+  { key: "airframe", label: "AIRFRAME", width: 160 },
+  { key: "serial", label: "SERIAL", width: 110 },
+  { key: "operator_name", label: "OPERADOR", width: 130 },
+  { key: "category_name", label: "CATEGORIA", width: 116 },
+  { key: "note", label: "NOTA", width: 240 },
+  { key: "created_at", label: "ALTA", width: 92 },
 ];
 
 const FILTERS: { key: FilterKey; label: string; placeholder: string }[] = [
-  { key: "icao", label: "ICAO", placeholder: "icao" },
-  { key: "reg", label: "REG", placeholder: "registration" },
-  { key: "airframe", label: "AIRFRAME", placeholder: "airframe" },
-  { key: "serial", label: "SERIAL", placeholder: "serial" },
-  { key: "operator_name", label: "OPERATOR", placeholder: "operator" },
-  { key: "category_name", label: "CATEGORY", placeholder: "category" },
-  { key: "note", label: "NOTE", placeholder: "note" },
-  { key: "created_at", label: "ADDED", placeholder: "YYYY-MM-DD" },
+  { key: "icao", label: "ICAO", placeholder: "hex" },
+  { key: "reg", label: "Matricula", placeholder: "matricula" },
+  { key: "airframe", label: "Airframe", placeholder: "airframe" },
+  { key: "serial", label: "Serial", placeholder: "serial" },
+  { key: "operator_name", label: "Operador", placeholder: "operador" },
+  { key: "category_name", label: "Categoria", placeholder: "categoria" },
+  { key: "note", label: "Nota", placeholder: "nota" },
+  { key: "created_at", label: "Alta", placeholder: "YYYY-MM-DD" },
 ];
 
 const EMPTY_FILTERS: Record<FilterKey, string> = {
@@ -64,11 +67,16 @@ const EMPTY_FORM = {
 
 type AircraftFormData = typeof EMPTY_FORM;
 
-const FORM_FIELDS: Array<{ key: keyof Pick<AircraftFormData, "icao" | "reg" | "serial" | "airframe">; label: string; required?: boolean; placeholder: string }> = [
-  { key: "icao", label: "ICAO", required: true, placeholder: "Required ICAO code" },
-  { key: "reg", label: "Registration", placeholder: "Tail / registration" },
-  { key: "airframe", label: "Airframe", placeholder: "Airframe family" },
-  { key: "serial", label: "Serial", placeholder: "Manufacturer serial" },
+const FORM_FIELDS: Array<{
+  key: keyof Pick<AircraftFormData, "icao" | "reg" | "serial" | "airframe">;
+  label: string;
+  required?: boolean;
+  placeholder: string;
+}> = [
+  { key: "icao", label: "ICAO", required: true, placeholder: "hex de 6 digitos" },
+  { key: "reg", label: "Matricula", placeholder: "matricula / tail" },
+  { key: "airframe", label: "Airframe", placeholder: "familia" },
+  { key: "serial", label: "Serial", placeholder: "serial de fabrica" },
 ];
 
 function rowToForm(row: AircraftView): AircraftFormData {
@@ -92,7 +100,9 @@ function adsbxIcaoUrl(icao: string) {
 }
 
 function adsbxIcaoListUrl(icaos: string[]) {
-  const uniqueIcaos = Array.from(new Set(icaos.map(icao => icao.trim()).filter(icao => Boolean(icao) && !isTbdIcao(icao))));
+  const uniqueIcaos = Array.from(
+    new Set(icaos.map(icao => icao.trim()).filter(icao => Boolean(icao) && !isTbdIcao(icao))),
+  );
   return `https://globe.adsbexchange.com/?icao=${uniqueIcaos.map(encodeURIComponent).join(",")}`;
 }
 
@@ -102,11 +112,12 @@ export default function FleetView() {
   const [operators, setOperators] = useState<Operator[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(25);
   const [search, setSearch] = useState("");
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState<Record<FilterKey, string>>(EMPTY_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState<Record<FilterKey, string>>(EMPTY_FILTERS);
+  const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState<SortKey>("id");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [loading, setLoading] = useState(true);
@@ -170,7 +181,8 @@ export default function FleetView() {
   useEffect(() => { fetchLookups(); }, [fetchLookups]);
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const activeFilterCount = Object.values(appliedFilters).filter(value => value.trim()).length + (query.trim() ? 1 : 0);
+  const activeFilterCount =
+    Object.values(appliedFilters).filter(value => value.trim()).length + (query.trim() ? 1 : 0);
   const selectedOperator = selected?.operator_id == null ? null : operators.find(o => o.id === selected.operator_id);
   const selectedCategory = selected?.category_id == null ? null : categories.find(c => c.id === selected.category_id);
 
@@ -213,7 +225,7 @@ export default function FleetView() {
     setPage(1);
     setSelected(null);
     if (sortBy === key) {
-      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+      setSortDir(prev => (prev === "asc" ? "desc" : "asc"));
       return;
     }
     setSortBy(key);
@@ -278,7 +290,9 @@ export default function FleetView() {
       const res = await fetch(`/api/operators/${operatorId}`);
       if (!res.ok) throw new Error("Failed to load operator ICAOs");
       const json = await res.json();
-      const icaos = Array.isArray(json.icaos) ? json.icaos.filter((icao: unknown): icao is string => typeof icao === "string") : [];
+      const icaos = Array.isArray(json.icaos)
+        ? json.icaos.filter((icao: unknown): icao is string => typeof icao === "string")
+        : [];
 
       if (icaos.length === 0) {
         target?.close();
@@ -299,165 +313,166 @@ export default function FleetView() {
   };
 
   const fmt = (v: unknown) => {
-    if (v == null || v === "") return <span className="text-ops-dim">-</span>;
+    if (v == null || v === "") return <span className="text-ops-faint">—</span>;
     if (typeof v === "string" && v.includes("T")) {
       const d = new Date(v);
-      if (!isNaN(d.getTime())) return d.toLocaleDateString("es-MX");
+      if (!isNaN(d.getTime())) return d.toLocaleDateString("es-MX", { day: "2-digit", month: "2-digit", year: "2-digit" });
     }
     return String(v);
   };
 
   return (
     <div>
-      {toast && (
-        <div
-          className={cn(
-            "fixed right-6 top-[70px] z-[200] rounded-md border px-5 py-2.5 font-mono text-xs tracking-[0.05em]",
-            toast.type === "ok"
-              ? "border-ops-active bg-ops-elevated text-ops-accentMuted"
-              : "border-ops-danger bg-red-400/15 text-ops-danger",
-          )}
-        >
-          {toast.type === "ok" ? "OK" : "ERROR"}: {toast.msg.toUpperCase()}
-        </div>
-      )}
+      {toast && <Toast message={toast.msg} type={toast.type} />}
 
-      <SectionHeader
-        eyebrow="Aircraft database"
-        title="Fleet"
-        meta={(
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="text-right">
-              <div className="font-mono text-xl font-semibold text-ops-text">{total.toLocaleString()}</div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-ops-dim">Aircraft</div>
-            </div>
-            <Button type="button" onClick={startCreate}>
-              Nueva aeronave
-            </Button>
-          </div>
-        )}
-      />
-
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="grid gap-2.5 xl:grid-cols-[minmax(0,1fr)_310px]">
         <div className="min-w-0">
-          <Panel className="mb-4 p-4">
+          {/* ------------------------------------------------------ toolbar */}
+          <Panel className="mb-2.5">
             <form onSubmit={handleFilterSubmit}>
-              <div className="mb-3 grid grid-cols-[minmax(240px,1.8fr)_repeat(auto-fit,minmax(140px,1fr))] gap-3">
-                <div>
-                  <FieldLabel>Global search</FieldLabel>
-                  <TextInput
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Search across ICAO, registration, category, operator..."
-                  />
-                </div>
-                {FILTERS.map(filter => (
-                  <div key={filter.key}>
-                    <FieldLabel>{filter.label}</FieldLabel>
-                    <TextInput
-                      value={filters[filter.key]}
-                      onChange={e => setFilters(prev => ({ ...prev, [filter.key]: e.target.value }))}
-                      placeholder={filter.placeholder}
-                    />
-                  </div>
-                ))}
-              </div>
+              <div className="flex flex-wrap items-center gap-1.5 px-2 py-2">
+                <TextInput
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="Buscar ICAO, matricula, airframe, operador, nota…"
+                  className="h-[26px] min-w-[200px] flex-1"
+                />
+                <Button type="submit" size="sm">Buscar</Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={showFilters ? "secondary" : "ghost"}
+                  onClick={() => setShowFilters(prev => !prev)}
+                >
+                  Filtros
+                  {activeFilterCount > 0 && (
+                    <span className="tnum ml-1 rounded-sm bg-ops-accentGhost px-1 text-ops-accent">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                  <ChevronDown size={11} className={cn("transition-transform", showFilters && "rotate-180")} />
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={resetFilters}
+                  disabled={activeFilterCount === 0}
+                >
+                  Limpiar
+                </Button>
 
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ops-border pt-3">
-                <div className="flex items-center gap-2">
-                  <Button type="submit">Apply filters</Button>
-                  <Button type="button" variant="secondary" onClick={resetFilters} disabled={activeFilterCount === 0}>
-                    Reset
-                  </Button>
-                  <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-ops-dim">
-                    {activeFilterCount} active filter{activeFilterCount === 1 ? "" : "s"}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[11px] uppercase tracking-[0.1em] text-ops-dim">Rows</span>
+                <span className="ml-auto flex items-center gap-1.5">
                   <SelectInput
                     value={pageSize}
                     onChange={e => { setPageSize(Number(e.target.value)); setPage(1); }}
-                    className="w-24 py-1.5 font-mono text-[11px]"
+                    className="h-[26px] w-[62px] py-0 font-mono text-[10.5px]"
+                    aria-label="Filas por pagina"
                   >
-                    {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+                    {[25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
                   </SelectInput>
-                </div>
+                  <Button type="button" size="sm" onClick={startCreate}>
+                    <Plus size={11} /> Nueva
+                  </Button>
+                </span>
               </div>
+
+              {showFilters && (
+                <div className="grid grid-cols-2 gap-1.5 border-t border-ops-border px-2 py-2 sm:grid-cols-4 xl:grid-cols-8">
+                  {FILTERS.map(filter => (
+                    <div key={filter.key}>
+                      <FieldLabel>{filter.label}</FieldLabel>
+                      <TextInput
+                        value={filters[filter.key]}
+                        onChange={e => setFilters(prev => ({ ...prev, [filter.key]: e.target.value }))}
+                        placeholder={filter.placeholder}
+                        className="h-[24px]"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </form>
           </Panel>
 
-          <Panel>
-            <div className="max-h-[720px] overflow-auto scrollbar-thin">
+          {/* -------------------------------------------------------- table */}
+          <Panel className="overflow-hidden">
+            <div className="max-h-[calc(100vh-230px)] min-h-[320px] overflow-auto scrollbar-thin">
               <table className="w-full table-fixed border-collapse">
                 <colgroup>
                   {COLS.map(c => <col key={c.key} style={{ width: c.width ?? "auto" }} />)}
-                  <col style={{ width: 132 }} />
+                  <col style={{ width: 84 }} />
                 </colgroup>
                 <thead className="sticky top-0 z-10">
-                  <tr className="bg-ops-elevated">
+                  <tr>
                     {COLS.map(col => {
                       const isActive = sortBy === col.key;
                       return (
-                        <TableHeaderCell key={col.key} className="whitespace-nowrap px-3 py-2.5">
+                        <TableHeaderCell key={col.key} className="whitespace-nowrap p-0">
                           <button
                             type="button"
                             onClick={() => handleSort(col.key)}
                             className={cn(
-                              "flex w-full items-center justify-between gap-2 font-mono uppercase tracking-[0.15em] transition",
-                              isActive ? "text-ops-text" : "text-ops-dim hover:text-ops-text",
+                              "flex w-full items-center gap-1 px-2 py-1.5 transition-colors",
+                              isActive ? "text-ops-text" : "hover:text-ops-secondary",
                             )}
-                            aria-label={`Sort by ${col.label}`}
+                            aria-label={`Ordenar por ${col.label}`}
                           >
-                            <span>{col.label}</span>
-                            <span className="text-[9px]">{isActive ? (sortDir === "asc" ? "ASC" : "DESC") : "SORT"}</span>
+                            <span className="truncate">{col.label}</span>
+                            {isActive && (
+                              <span className="text-ops-accent" aria-hidden="true">
+                                {sortDir === "asc" ? "↑" : "↓"}
+                              </span>
+                            )}
                           </button>
                         </TableHeaderCell>
                       );
                     })}
-                    <TableHeaderCell className="whitespace-nowrap px-3 py-2.5">ACTIONS</TableHeaderCell>
+                    <TableHeaderCell className="whitespace-nowrap">ACC</TableHeaderCell>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <EmptyTableState colSpan={COLS.length + 1}>LOADING...</EmptyTableState>
+                    <EmptyTableState colSpan={COLS.length + 1}>CARGANDO…</EmptyTableState>
                   ) : data.length === 0 ? (
-                    <EmptyTableState colSpan={COLS.length + 1}>NO AIRCRAFT FOUND</EmptyTableState>
-                  ) : data.map((row) => (
+                    <EmptyTableState colSpan={COLS.length + 1}>SIN RESULTADOS</EmptyTableState>
+                  ) : data.map(row => (
                     <tr
                       key={row.id}
                       onClick={() => setSelected(row.id === selected?.id ? null : row)}
                       className={cn(
-                        "cursor-pointer border-b border-ops-border transition hover:bg-ops-elevated",
-                        selected?.id === row.id && "bg-ops-accentGhost",
-                        editingId === row.id && "bg-ops-accentGhost",
+                        "cursor-pointer border-b border-ops-border transition-colors hover:bg-ops-hover",
+                        (selected?.id === row.id || editingId === row.id) && "bg-ops-accentGhost",
                       )}
                     >
                       {COLS.map(col => (
                         <td
                           key={col.key}
                           className={cn(
-                            "overflow-hidden text-ellipsis whitespace-nowrap px-3 py-[9px]",
-                            col.key === "icao" ? "font-semibold text-ops-text" : "text-ops-text",
-                            col.key === "id" && "font-mono text-[11px] text-ops-dim",
-                            col.key === "note" && "text-ops-secondary",
+                            "overflow-hidden text-ellipsis whitespace-nowrap px-2 py-[5px] text-[11.5px]",
+                            col.key === "id" && "tnum font-mono text-[10.5px] text-ops-faint",
+                            col.key === "icao" && "font-mono font-medium",
+                            (col.key === "reg" || col.key === "serial") && "font-mono text-[11px] text-ops-secondary",
+                            col.key === "note" && "text-ops-dim",
+                            col.key === "created_at" && "tnum font-mono text-[10.5px] text-ops-dim",
                           )}
                           title={String(row[col.key as keyof AircraftView] ?? "")}
                         >
                           {col.key === "id" ? (
-                            `#${row.id}`
+                            row.id
                           ) : col.key === "icao" && row.icao && !isTbdIcao(row.icao) ? (
                             <a
                               href={adsbxIcaoUrl(row.icao)}
                               target="_blank"
                               rel="noreferrer"
                               onClick={event => event.stopPropagation()}
-                              className="text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
+                              className="ops-link"
                               title={`Abrir ${row.icao} en ADSBExchange`}
                             >
                               {row.icao}
                             </a>
+                          ) : col.key === "icao" && row.icao && isTbdIcao(row.icao) ? (
+                            <span className="text-ops-danger">TBD</span>
                           ) : col.key === "operator_name" && row.operator_id && row.operator_name ? (
                             <button
                               type="button"
@@ -465,7 +480,7 @@ export default function FleetView() {
                                 event.stopPropagation();
                                 openOperatorIcaos(row.operator_id as number, row.operator_name as string);
                               }}
-                              className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
+                              className="ops-link max-w-full truncate text-left"
                               title={`Abrir todos los ICAO de ${row.operator_name} en ADSBExchange`}
                             >
                               {row.operator_name}
@@ -475,16 +490,16 @@ export default function FleetView() {
                           )}
                         </td>
                       ))}
-                      <td className="px-3 py-[9px]" onClick={e => e.stopPropagation()}>
+                      <td className="px-2 py-[5px]" onClick={e => e.stopPropagation()}>
                         {confirmDelete === row.id ? (
                           <div className="flex gap-1">
-                            <Button size="sm" variant="danger" onClick={() => handleDelete(row.id)}>OK</Button>
-                            <Button size="sm" variant="secondary" onClick={() => setConfirmDelete(null)}>NO</Button>
+                            <Button size="xs" variant="danger" onClick={() => handleDelete(row.id)}>SI</Button>
+                            <Button size="xs" variant="secondary" onClick={() => setConfirmDelete(null)}>NO</Button>
                           </div>
                         ) : (
                           <div className="flex gap-1">
-                            <Button size="sm" variant="secondary" onClick={() => startEdit(row)}>EDIT</Button>
-                            <Button size="sm" variant="danger" onClick={() => setConfirmDelete(row.id)}>DEL</Button>
+                            <Button size="xs" variant="secondary" onClick={() => startEdit(row)}>ED</Button>
+                            <Button size="xs" variant="danger" onClick={() => setConfirmDelete(row.id)}>DEL</Button>
                           </div>
                         )}
                       </td>
@@ -494,25 +509,18 @@ export default function FleetView() {
               </table>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ops-border bg-ops-elevated px-4 py-2.5">
-              <span className="text-[11px] text-ops-dim">
-                PAGE {page} / {totalPages} - {total} RECORDS - ORDER {String(sortBy).toUpperCase()} {sortDir.toUpperCase()}
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-ops-border px-2 py-1.5">
+              <span className="tnum font-mono text-[10.5px] text-ops-dim">
+                {total.toLocaleString("es-MX")} registros · pagina {page}/{totalPages}
               </span>
               <div className="flex gap-1">
                 {[
-                  { label: "<<", onClick: () => setPage(1), disabled: page === 1 },
-                  { label: "<", onClick: () => setPage(p => Math.max(1, p - 1)), disabled: page === 1 },
-                  { label: ">", onClick: () => setPage(p => Math.min(totalPages, p + 1)), disabled: page >= totalPages },
-                  { label: ">>", onClick: () => setPage(totalPages), disabled: page >= totalPages },
+                  { label: "«", onClick: () => setPage(1), disabled: page === 1 },
+                  { label: "‹", onClick: () => setPage(p => Math.max(1, p - 1)), disabled: page === 1 },
+                  { label: "›", onClick: () => setPage(p => Math.min(totalPages, p + 1)), disabled: page >= totalPages },
+                  { label: "»", onClick: () => setPage(totalPages), disabled: page >= totalPages },
                 ].map(btn => (
-                  <Button
-                    key={btn.label}
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={btn.onClick}
-                    disabled={btn.disabled}
-                  >
+                  <Button key={btn.label} type="button" size="xs" variant="secondary" onClick={btn.onClick} disabled={btn.disabled}>
                     {btn.label}
                   </Button>
                 ))}
@@ -521,27 +529,114 @@ export default function FleetView() {
           </Panel>
         </div>
 
-        <aside className="space-y-4 xl:sticky xl:top-[72px] xl:self-start">
-          <Panel className={cn("p-4", editingId !== null && "border-ops-active")}>
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ops-dim">
-                  {editingId ? `EDIT RECORD #${editingId}` : "NEW AIRCRAFT"}
+        {/* --------------------------------------------------------- aside */}
+        <aside className="space-y-2.5 xl:sticky xl:top-[56px] xl:self-start">
+          {selected && (
+            <Panel className="border-ops-active">
+              <div className="flex items-center justify-between gap-2 border-b border-ops-border px-2.5 py-1.5">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-mono text-[13px] font-semibold text-ops-text">
+                    {selected.icao && !isTbdIcao(selected.icao) ? (
+                      <a href={adsbxIcaoUrl(selected.icao)} target="_blank" rel="noreferrer" className="ops-link">
+                        {selected.icao}
+                      </a>
+                    ) : (
+                      <span className="text-ops-danger">{selected.icao || `#${selected.id}`}</span>
+                    )}
+                  </span>
+                  <span className="font-mono text-[11px] text-ops-dim">{selected.reg || "—"}</span>
                 </div>
-                <div className="mt-1 text-base font-semibold text-ops-text">
-                  {editingId ? form.icao || "Editar aeronave" : "Agregar aeronave"}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelected(null)}
+                  aria-label="Cerrar detalle"
+                  className="text-ops-dim transition-colors hover:text-ops-text"
+                >
+                  <X size={13} />
+                </button>
               </div>
-              <Button type="button" size="sm" variant="secondary" onClick={startCreate}>
-                Nuevo
-              </Button>
+
+              <dl className="grid grid-cols-2 gap-px bg-ops-border">
+                {[
+                  ["ID", `#${selected.id}`],
+                  ["AIRFRAME", selected.airframe || "—"],
+                  ["SERIAL", selected.serial || "—"],
+                  ["CATEGORIA", selectedCategory?.name ?? selected.category_name ?? "—"],
+                  ["ALTA", fmt(selected.created_at)],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="bg-ops-panel px-2.5 py-1.5">
+                    <dt className="ops-eyebrow">{label}</dt>
+                    <dd className="truncate text-[11.5px] text-ops-text">{value}</dd>
+                  </div>
+                ))}
+                <div className="bg-ops-panel px-2.5 py-1.5">
+                  <dt className="ops-eyebrow">OPERADOR</dt>
+                  <dd className="truncate text-[11.5px] text-ops-text">
+                    {selected.operator_id && (selectedOperator?.name || selected.operator_name) ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openOperatorIcaos(
+                            selected.operator_id as number,
+                            selectedOperator?.name ?? selected.operator_name ?? "operador",
+                          )
+                        }
+                        className="ops-link max-w-full truncate text-left"
+                      >
+                        {selectedOperator?.name ?? selected.operator_name}
+                      </button>
+                    ) : "—"}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="border-t border-ops-border px-2.5 py-1.5">
+                <div className="ops-eyebrow">NOTA</div>
+                <div className="text-[11.5px] text-ops-secondary">{fmt(selected.note)}</div>
+              </div>
+
+              <div className="flex gap-1.5 border-t border-ops-border px-2.5 py-1.5">
+                <Button type="button" size="sm" variant="secondary" onClick={() => startEdit(selected)}>
+                  Editar
+                </Button>
+                {confirmDelete === selected.id ? (
+                  <>
+                    <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selected.id)}>
+                      Confirmar
+                    </Button>
+                    <Button type="button" size="sm" variant="secondary" onClick={() => setConfirmDelete(null)}>
+                      Cancelar
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="button" size="sm" variant="danger" onClick={() => setConfirmDelete(selected.id)}>
+                    Eliminar
+                  </Button>
+                )}
+              </div>
+            </Panel>
+          )}
+
+          <Panel className={cn(editingId !== null && "border-ops-active")}>
+            <div className="flex items-center justify-between gap-2 border-b border-ops-border px-2.5 py-1.5">
+              <span className="ops-eyebrow">
+                {editingId ? `Editando #${editingId}` : "Nueva aeronave"}
+              </span>
+              {editingId && (
+                <Button type="button" size="xs" variant="ghost" onClick={startCreate}>
+                  Nuevo
+                </Button>
+              )}
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-3">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
+            <form onSubmit={handleSubmit} className="space-y-2 px-2.5 py-2">
+              <div className="grid grid-cols-2 gap-2">
                 {FORM_FIELDS.map(field => (
                   <div key={field.key}>
-                    <FieldLabel>{field.label} {field.required && "*"}</FieldLabel>
+                    <FieldLabel>
+                      {field.label}
+                      {field.required && <span className="text-ops-danger"> *</span>}
+                    </FieldLabel>
                     <TextInput
                       value={form[field.key]}
                       onChange={e => setForm(prev => ({ ...prev, [field.key]: e.target.value }))}
@@ -551,24 +646,24 @@ export default function FleetView() {
                   </div>
                 ))}
                 <div>
-                  <FieldLabel>Operator</FieldLabel>
+                  <FieldLabel>Operador</FieldLabel>
                   <SelectInput
                     value={form.operator_id}
                     onChange={e => setForm(prev => ({ ...prev, operator_id: e.target.value }))}
                   >
-                    <option value="">- Sin operador -</option>
+                    <option value="">— sin operador —</option>
                     {operators.map(operator => (
                       <option key={operator.id} value={operator.id}>{operator.name}</option>
                     ))}
                   </SelectInput>
                 </div>
                 <div>
-                  <FieldLabel>Category</FieldLabel>
+                  <FieldLabel>Categoria</FieldLabel>
                   <SelectInput
                     value={form.category_id}
                     onChange={e => setForm(prev => ({ ...prev, category_id: e.target.value }))}
                   >
-                    <option value="">- Sin categoria -</option>
+                    <option value="">— sin categoria —</option>
                     {categories.map(category => (
                       <option key={category.id} value={category.id}>{category.name}</option>
                     ))}
@@ -577,116 +672,30 @@ export default function FleetView() {
               </div>
 
               <div>
-                <FieldLabel>Note</FieldLabel>
+                <FieldLabel>Nota</FieldLabel>
                 <TextareaInput
                   value={form.note}
                   onChange={e => setForm(prev => ({ ...prev, note: e.target.value }))}
-                  placeholder="Nota operativa, observaciones o estado..."
-                  rows={4}
+                  placeholder="Observaciones operativas…"
+                  rows={3}
                   className="resize-y"
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2 border-t border-ops-border pt-3">
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Guardando..." : editingId ? "Actualizar" : "Agregar"}
+              <div className="flex items-center gap-1.5 pt-0.5">
+                <Button type="submit" size="sm" disabled={saving}>
+                  {saving ? "Guardando…" : editingId ? "Actualizar" : "Agregar"}
                 </Button>
                 {editingId && (
-                  <Button type="button" variant="secondary" onClick={resetForm}>
+                  <Button type="button" size="sm" variant="secondary" onClick={resetForm}>
                     Cancelar
                   </Button>
                 )}
+                {!editingId && form.icao && isTbdIcao(form.icao) && (
+                  <Badge tone="danger">No rastreable</Badge>
+                )}
               </div>
             </form>
-          </Panel>
-
-          <Panel className={cn("p-4", selected && "border-ops-active")}>
-            {selected ? (
-              <>
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <div className="font-mono text-[10px] uppercase tracking-[0.16em] text-ops-dim">SELECTED RECORD</div>
-                    <div className="mt-1 text-base font-semibold text-ops-text">
-                      {selected.icao && !isTbdIcao(selected.icao) ? (
-                        <a
-                          href={adsbxIcaoUrl(selected.icao)}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
-                        >
-                          {selected.icao}
-                        </a>
-                      ) : (
-                        selected.icao ?? `#${selected.id}`
-                      )}
-                    </div>
-                  </div>
-                  <button onClick={() => setSelected(null)} className="text-base text-ops-dim transition hover:text-ops-text">
-                    Close
-                  </button>
-                </div>
-
-                <div className="mb-4 grid grid-cols-2 gap-2">
-                  {[
-                    ["ID", `#${selected.id}`],
-                    ["REG", selected.reg || "-"],
-                    ["AIRFRAME", selected.airframe || "-"],
-                    ["SERIAL", selected.serial || "-"],
-                    ["CATEGORY", selectedCategory?.name ?? selected.category_name ?? "-"],
-                    ["ADDED", fmt(selected.created_at)],
-                  ].map(([label, value]) => (
-                    <div key={String(label)} className="rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
-                      <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">{label}</div>
-                      <div className="overflow-hidden text-ellipsis whitespace-nowrap text-ops-text">{value}</div>
-                    </div>
-                  ))}
-                  <div className="rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
-                    <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">OPERATOR</div>
-                    {selected.operator_id && (selectedOperator?.name || selected.operator_name) ? (
-                      <button
-                        type="button"
-                        onClick={() => openOperatorIcaos(selected.operator_id as number, selectedOperator?.name ?? selected.operator_name ?? "operador")}
-                        className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-left text-ops-accentMuted underline decoration-ops-border underline-offset-4 transition hover:text-ops-accent"
-                        title={`Abrir todos los ICAO de ${selectedOperator?.name ?? selected.operator_name} en ADSBExchange`}
-                      >
-                        {selectedOperator?.name ?? selected.operator_name}
-                      </button>
-                    ) : (
-                      <div className="text-ops-text">-</div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mb-4 rounded-md border border-ops-border bg-ops-elevated px-3.5 py-2.5">
-                  <div className="mb-1 text-[9px] tracking-[0.15em] text-ops-dim">NOTE</div>
-                  <div className="text-ops-secondary">{fmt(selected.note)}</div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="secondary" onClick={() => startEdit(selected)}>
-                    Editar
-                  </Button>
-                  {confirmDelete === selected.id ? (
-                    <>
-                      <Button type="button" variant="danger" onClick={() => handleDelete(selected.id)}>
-                        Confirmar
-                      </Button>
-                      <Button type="button" variant="secondary" onClick={() => setConfirmDelete(null)}>
-                        Cancelar
-                      </Button>
-                    </>
-                  ) : (
-                    <Button type="button" variant="danger" onClick={() => setConfirmDelete(selected.id)}>
-                      Eliminar
-                    </Button>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="py-6 text-center text-ops-dim">
-                Selecciona una fila para ver el detalle sin salir del dashboard.
-              </div>
-            )}
           </Panel>
         </aside>
       </div>
