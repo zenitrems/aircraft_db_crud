@@ -49,3 +49,8 @@ export interface UnidentifiedAircraft {
 }
 
 export type UnidentifiedAircraftInput = Omit<UnidentifiedAircraft, "id">;
+
+export interface AdsbxSelection {
+  icaos: string[];
+  token: number;
+}

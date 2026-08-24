@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus, X } from "lucide-react";
+import { ChevronDown, Plus, Radar, X } from "lucide-react";
 import type { AircraftView, Category, Operator } from "@/lib/types";
 import {
   Badge,
@@ -99,14 +99,15 @@ function adsbxIcaoUrl(icao: string) {
   return `https://globe.adsbexchange.com/?icao=${encodeURIComponent(icao.trim())}`;
 }
 
-function adsbxIcaoListUrl(icaos: string[]) {
-  const uniqueIcaos = Array.from(
-    new Set(icaos.map(icao => icao.trim()).filter(icao => Boolean(icao) && !isTbdIcao(icao))),
-  );
-  return `https://globe.adsbexchange.com/?icao=${uniqueIcaos.map(encodeURIComponent).join(",")}`;
+function usableIcaos(icaos: string[]) {
+  return Array.from(new Set(icaos.map(icao => icao.trim()).filter(icao => Boolean(icao) && !isTbdIcao(icao))));
 }
 
-export default function FleetView() {
+function adsbxIcaoListUrl(icaos: string[]) {
+  return `https://globe.adsbexchange.com/?icao=${usableIcaos(icaos).map(encodeURIComponent).join(",")}`;
+}
+
+export default function FleetView({ onViewInAdsbx }: { onViewInAdsbx?: (icaos: string[]) => void } = {}) {
   const [data, setData] = useState<AircraftView[]>([]);
   const [total, setTotal] = useState(0);
   const [operators, setOperators] = useState<Operator[]>([]);
@@ -127,6 +128,9 @@ export default function FleetView() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ msg: string; type: "ok" | "err" } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+  // Keyed by id (not a Set) so a selection survives paging/filtering — we keep
+  // the row data itself since off-page rows won't be in `data` anymore.
+  const [checkedRows, setCheckedRows] = useState<Map<number, AircraftView>>(new Map());
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams({
@@ -185,6 +189,35 @@ export default function FleetView() {
     Object.values(appliedFilters).filter(value => value.trim()).length + (query.trim() ? 1 : 0);
   const selectedOperator = selected?.operator_id == null ? null : operators.find(o => o.id === selected.operator_id);
   const selectedCategory = selected?.category_id == null ? null : categories.find(c => c.id === selected.category_id);
+  const pageAllChecked = data.length > 0 && data.every(row => checkedRows.has(row.id));
+
+  const toggleChecked = (row: AircraftView) => {
+    setCheckedRows(prev => {
+      const next = new Map(prev);
+      if (next.has(row.id)) next.delete(row.id); else next.set(row.id, row);
+      return next;
+    });
+  };
+
+  const togglePageChecked = () => {
+    setCheckedRows(prev => {
+      const next = new Map(prev);
+      if (pageAllChecked) data.forEach(row => next.delete(row.id));
+      else data.forEach(row => next.set(row.id, row));
+      return next;
+    });
+  };
+
+  const clearChecked = () => setCheckedRows(new Map());
+
+  const sendCheckedToAdsbx = () => {
+    const icaos = usableIcaos(Array.from(checkedRows.values()).map(row => row.icao));
+    if (icaos.length === 0) {
+      showToast("Ninguno de los seleccionados tiene ICAO rastreable", "err");
+      return;
+    }
+    onViewInAdsbx?.(icaos);
+  };
 
   const handleFilterSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -395,16 +428,51 @@ export default function FleetView() {
             </form>
           </Panel>
 
+          {/* --------------------------------------------------- selection bar */}
+          {checkedRows.size > 0 && (
+            <Panel className="mb-2.5 border-ops-active">
+              <div className="flex flex-wrap items-center gap-1.5 px-2 py-1.5">
+                <span className="tnum font-mono text-[10.5px] text-ops-accent">
+                  {checkedRows.size} seleccionada{checkedRows.size === 1 ? "" : "s"}
+                </span>
+                <Button type="button" size="xs" onClick={sendCheckedToAdsbx}>
+                  <Radar size={10} /> Ver en ADSBX
+                </Button>
+                <Button
+                  type="button"
+                  size="xs"
+                  variant="secondary"
+                  onClick={() => window.open(adsbxIcaoListUrl(Array.from(checkedRows.values()).map(r => r.icao)), "_blank", "noopener,noreferrer")}
+                >
+                  Pestaña nueva
+                </Button>
+                <Button type="button" size="xs" variant="ghost" onClick={clearChecked}>
+                  Limpiar seleccion
+                </Button>
+              </div>
+            </Panel>
+          )}
+
           {/* -------------------------------------------------------- table */}
           <Panel className="overflow-hidden">
             <div className="max-h-[calc(100vh-230px)] min-h-[320px] overflow-auto scrollbar-thin">
               <table className="w-full table-fixed border-collapse">
                 <colgroup>
+                  <col style={{ width: 28 }} />
                   {COLS.map(c => <col key={c.key} style={{ width: c.width ?? "auto" }} />)}
                   <col style={{ width: 84 }} />
                 </colgroup>
                 <thead className="sticky top-0 z-10">
                   <tr>
+                    <TableHeaderCell className="px-2 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={pageAllChecked}
+                        onChange={togglePageChecked}
+                        aria-label="Seleccionar todas las filas de la pagina"
+                        className="h-3 w-3 accent-ops-accent"
+                      />
+                    </TableHeaderCell>
                     {COLS.map(col => {
                       const isActive = sortBy === col.key;
                       return (
@@ -433,9 +501,9 @@ export default function FleetView() {
                 </thead>
                 <tbody>
                   {loading ? (
-                    <EmptyTableState colSpan={COLS.length + 1}>CARGANDO…</EmptyTableState>
+                    <EmptyTableState colSpan={COLS.length + 2}>CARGANDO…</EmptyTableState>
                   ) : data.length === 0 ? (
-                    <EmptyTableState colSpan={COLS.length + 1}>SIN RESULTADOS</EmptyTableState>
+                    <EmptyTableState colSpan={COLS.length + 2}>SIN RESULTADOS</EmptyTableState>
                   ) : data.map(row => (
                     <tr
                       key={row.id}
@@ -443,8 +511,18 @@ export default function FleetView() {
                       className={cn(
                         "cursor-pointer border-b border-ops-border transition-colors hover:bg-ops-hover",
                         (selected?.id === row.id || editingId === row.id) && "bg-ops-accentGhost",
+                        checkedRows.has(row.id) && "bg-ops-accentGhost",
                       )}
                     >
+                      <td className="px-2 py-[5px]" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={checkedRows.has(row.id)}
+                          onChange={() => toggleChecked(row)}
+                          aria-label={`Seleccionar ${row.icao || `#${row.id}`}`}
+                          className="h-3 w-3 accent-ops-accent"
+                        />
+                      </td>
                       {COLS.map(col => (
                         <td
                           key={col.key}

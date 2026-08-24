@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
+import AdsbxView from "@/components/AdsbxView";
 import FleetView from "@/components/FleetView";
 import UnidentifiedAircraftView from "@/components/UnidentifiedAircraftView";
+import type { AdsbxSelection } from "@/lib/types";
 import { cn } from "@/components/ui";
 
-type Tab = "fleet" | "unknown";
+type Tab = "fleet" | "unknown" | "adsbx";
 
 const TABS: Array<{ key: Tab; label: string; hint: string }> = [
   { key: "fleet", label: "Flota", hint: "Registro identificado" },
   { key: "unknown", label: "Sin identificar", hint: "Contactos abiertos" },
+  { key: "adsbx", label: "ADSBX", hint: "Mapa en vivo filtrado" },
 ];
 
 /**
@@ -18,6 +21,12 @@ const TABS: Array<{ key: Tab; label: string; hint: string }> = [
  */
 export default function DashboardTabs({ unknownCount }: { unknownCount: number }) {
   const [tab, setTab] = useState<Tab>("fleet");
+  const [adsbxSelection, setAdsbxSelection] = useState<AdsbxSelection | null>(null);
+
+  const viewInAdsbx = (icaos: string[]) => {
+    setAdsbxSelection({ icaos, token: Date.now() });
+    setTab("adsbx");
+  };
 
   return (
     <div className="space-y-2.5">
@@ -47,10 +56,13 @@ export default function DashboardTabs({ unknownCount }: { unknownCount: number }
       </div>
 
       <div hidden={tab !== "fleet"}>
-        <FleetView />
+        <FleetView onViewInAdsbx={viewInAdsbx} />
       </div>
       <div hidden={tab !== "unknown"}>
         <UnidentifiedAircraftView />
+      </div>
+      <div hidden={tab !== "adsbx"}>
+        <AdsbxView selection={adsbxSelection} />
       </div>
     </div>
   );
